@@ -424,6 +424,7 @@ function reminders(){ // avisos mientras la app está abierta
 }
 setInterval(reminders,60000);
 
+let askEl=null,askT;const ask=(el,msg)=>{if(askEl===el){askEl=null;return true}askEl=el;const o=el.textContent;el.textContent=msg;clearTimeout(askT);askT=setTimeout(()=>{askEl=null;el.textContent=o},4000);return false};
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const [a,x,y]=el.dataset.act.split(':');
@@ -442,7 +443,7 @@ document.addEventListener('click',e=>{
    case'startplan':{if(x==='pick'){sheet(`<h3>Elegir sesión</h3>${Array.from({length:7},(_,i)=>addD(weekStart(today()),i)).filter(d=>sessionFor(d)).map(d=>`<button class="btn sec" style="margin-top:8px" data-act="startplan:${d}">${DNL[dow(d)]} · ${esc(sessionFor(d).nombre)}</button>`).join('')}`);break}closeSheet();startWork(sessionFor(x));break}
    case'startfree':startWork({nombre:'Entreno libre',ex:[]});break;
    case'delset':{const w=S.work;w.ex[+x].done.splice(+y,1);save();render();break}
-   case'cancelwork':if(confirm('¿Descartar este entrenamiento?')){S.work=null;S.restEnd=0;save();render()}break;
+   case'cancelwork':if(ask(el,'¿Seguro? Toca otra vez')){S.work=null;S.restEnd=0;save();render()}break;
    case'finish':finish();break;
    case'delmeta':S.metas=S.metas.filter(m=>m.id!==x);save();render();break;
    case'tema':S.ajustes.tema=x;save();applyTheme();render();break;
@@ -452,7 +453,7 @@ document.addEventListener('click',e=>{
    case'export':dl('fittrack-respaldo-'+today()+'.json','application/json',JSON.stringify(S));break;
    case'import':$('#file').click();break;
    case'csv':csv();break;
-   case'reset':if(confirm('¿Borrar TODOS los datos? No se puede deshacer.')){localStorage.removeItem(KEY);location.reload()}break;
+   case'reset':if(ask(el,'¿Seguro? Toca otra vez para borrar')){localStorage.removeItem(KEY);location.reload()}break;
   }
 });
 document.addEventListener('change',e=>{

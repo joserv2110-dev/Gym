@@ -3,7 +3,7 @@
 App web instalable (PWA), sin cuentas ni servidores: tus datos se guardan en tu iPhone y funciona sin conexión.
 
 ## Instalar en el iPhone
-1. Publica la carpeta `app/` en un hosting HTTPS gratuito (GitHub Pages: *Settings → Pages → rama → carpeta `/app`*; o Netlify/Cloudflare Pages arrastrando la carpeta).
+1. Publica la carpeta `docs/` en un hosting HTTPS gratuito (GitHub Pages: *Settings → Pages → rama → carpeta `/docs`*; o Netlify/Cloudflare Pages arrastrando la carpeta).
 2. Abre la URL en **Safari** → botón Compartir → **Añadir a pantalla de inicio**.
 3. Abre FitTrack, completa tu perfil (edad, peso, estatura, objetivo, nivel, días, minutos, equipo, meta). Las metas de calorías, proteína, agua, pasos y sueño se calculan solas.
 
@@ -18,7 +18,7 @@ App web instalable (PWA), sin cuentas ni servidores: tus datos se guardan en tu 
 
 ## Siri, Salud y automatizaciones (Atajos)
 La app registra datos al abrir una URL con parámetros: `agua`, `pasos`, `sueno`, `peso`, `kcal`, `prot`, `cardio`.
-Ejemplo: `https://TU-URL/app/index.html?agua=250&pasos=8500&sueno=7.5`
+Ejemplo: `https://TU-URL/index.html?agua=250&pasos=8500&sueno=7.5`
 
 Atajos recomendados (app Atajos → *Abrir URLs*):
 - **Agua** (Siri: “Oye Siri, agua”): `?agua=250`.

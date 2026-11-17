@@ -467,6 +467,7 @@ document.addEventListener('click',e=>{
    case'dia':el.classList.toggle('on');break;
    case'startplan':{if(x==='pick'){sheet(`<h3>Elegir sesión</h3>${Array.from({length:7},(_,i)=>addD(weekStart(today()),i)).filter(d=>sessionFor(d)).map(d=>`<button class="btn sec" style="margin-top:8px" data-act="startplan:${d}">${DNL[dow(d)]} · ${esc(sessionFor(d).nombre)}</button>`).join('')}`);break}closeSheet();startWork(sessionFor(x));break}
    case'how':case'hown':{const nm=a==='how'?S.work.ex[+x].n:el.dataset.n,ex=animFor(nm);sheet(howSheet(nm,a==='hown'));if(ex)playAnim(ex);break}
+   case'mode':mode3=x==='3d';syncModes();if(curEx)playAnim(curEx);break
    case'mu':{const i=muSel.indexOf(x);if(i>=0)muSel.splice(i,1);else muSel.push(x);el.classList.toggle('on');break}
    case'genmu':{if(!muSel.length)return toast('Elige al menos un músculo');muShift=x==='next'?muShift+1:0;muRoutine=muscleRoutine(muSel,muShift);sheet(SH.murutina());break}
    case'startmu':closeSheet();startWork(muRoutine);break;
@@ -597,6 +598,7 @@ const ANIM={
   back:()=>tower(215)+box(130,-10,60,6,'var(--card)'),front:J=>cable(J.hnd,[170,-8]),
   cues:['Codos pegados al cuerpo, no se mueven.','Estira los brazos hasta abajo apretando el tríceps.','Sube hasta ~90° de codo, controlado.','No balancees el torso.']}
 };
+Object.keys(ANIM).forEach(k=>{ANIM[k].id=k});
 const ANIMMAP=[[/zancada|búlgara|step/i,'zancada'],[/sentadilla|prensa|cuádriceps|goblet/i,'sentadilla'],[/pica|flexiones|fondos/i,'flexiones'],
  [/curl femoral|peso muerto|buenos días/i,'pesomuerto'],[/curl/i,'curl'],[/press militar|press de hombro/i,'pressmilitar'],[/press|aperturas|pullover/i,'pressbanca'],
  [/jalón|dominadas/i,'jalon'],[/remo|face pull|pájaros|superman/i,'remo'],[/elevaciones laterales|elevaciones frontales|elevación lateral/i,'elevacion'],
@@ -616,24 +618,102 @@ function drawAnim(ex,p){
   if(hl('ua'))s+=limb(J.sho,J.elb,9,R,act);if(hl('fa'))s+=limb(J.elb,J.hnd,8,R,act);
   if(ex.front)s+=ex.front(J);return s;
 }
-let animId=0;
+let animId=0,mode3=true,curEx=null;
+const S3={
+ sentadilla:['dumb'],zancada:['dumb'],curl:['dumb'],pressmilitar:['dumb'],elevacion:['dumb'],pesomuerto:['bar'],
+ pressbanca:['bar',['box',55,168,150,9,34],['box',68,177,6,27,6],['box',186,177,6,27,6]],
+ jalon:[['box',105,158,48,7,34],['box',129,165,5,39,5],['tower',215,-8],['cable',140,-8]],
+ remo:[['box',60,176,70,8,34],['box',72,184,5,20,5],['box',118,184,5,20,5],['box',165,160,6,44,34],['tower',240,40],['cable',250,128]],
+ triceps:[['tower',215,-8],['cable',170,-8],['box',130,-10,60,6,30]]
+};
+function loadThree(){
+  if(window.THREE)return Promise.resolve();
+  return new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s);setTimeout(()=>no(new Error('timeout')),9000)});
+}
+function webgl(){try{const c=document.createElement('canvas');return!!(c.getContext('webgl')||c.getContext('experimental-webgl'))}catch(e){return false}}
+const sheetOpen=()=>document.getElementById('sheetbg').classList.contains('on');
 function playAnim(ex){
-  const id=++animId,t0=performance.now(),el=document.getElementById('anim'),lab=document.getElementById('animlab');
-  const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const id=++animId;curEx=ex;const svg=document.getElementById('anim'),c3=document.getElementById('anim3');if(!svg)return;
+  if(mode3&&webgl()){
+    svg.style.display='none';c3.style.display='block';c3.innerHTML='<div class="mu sm" style="padding:60px 0;text-align:center">Cargando 3D…</div>';
+    loadThree().then(()=>{if(id===animId)run3D(ex,c3,id)}).catch(()=>{if(id!==animId)return;mode3=false;syncModes();toast('3D no disponible sin internet. Mostrando 2D.');playAnim(ex)});
+    return;
+  }
+  c3.style.display='none';c3.innerHTML='';svg.style.display='block';
+  const t0=performance.now(),lab=document.getElementById('animlab'),reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
   (function f(now){
-    if(id!==animId||!el||!document.body.contains(el)||!document.getElementById('sheetbg').classList.contains('on'))return;
+    if(id!==animId||!document.body.contains(svg)||!sheetOpen())return;
     const per=ex.static?4:3.6,ph=(((now-t0)/1000)%per)/per,p=reduce?1:.5-.5*Math.cos(2*Math.PI*ph);
-    el.innerHTML=drawAnim(ex,p);lab.textContent=ph<.5?ex.lab[0]:ex.lab[1];requestAnimationFrame(f);
+    svg.innerHTML=drawAnim(ex,p);lab.textContent=ph<.5?ex.lab[0]:ex.lab[1];requestAnimationFrame(f);
   })(t0);
 }
+function syncModes(){document.querySelectorAll('#modes .chip').forEach((c,i)=>c.classList.toggle('on',(i===0)===mode3))}
+function run3D(ex,host,id){
+  host.innerHTML='';
+  const W=host.clientWidth||340,H=Math.round(W*.8),lab=document.getElementById('animlab');
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.setSize(W,H);
+  const cvs=renderer.domElement;cvs.style.cssText='width:100%;display:block;touch-action:none;border-radius:12px';host.appendChild(cvs);
+  const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(34,W/H,1,2000);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x556070,1));const dl=new THREE.DirectionalLight(0xffffff,.85);dl.position.set(160,320,220);scene.add(dl);
+  const cs=getComputedStyle(document.documentElement),cv=n=>cs.getPropertyValue(n).trim();
+  const fig=cv('--fig')||'#aab4c3',mat=new THREE.MeshStandardMaterial({color:fig,roughness:.55,metalness:.05}),far=new THREE.MeshStandardMaterial({color:new THREE.Color(fig).multiplyScalar(.72),roughness:.6});
+  const red=new THREE.MeshStandardMaterial({color:0xef4444,emissive:0x7f1d1d,transparent:true,opacity:.8,depthWrite:false});
+  const gear=new THREE.MeshStandardMaterial({color:0x64748b,roughness:.6}),dark=new THREE.MeshStandardMaterial({color:0x334155,roughness:.6}),steel=new THREE.MeshStandardMaterial({color:0x475569,metalness:.3,roughness:.4});
+  const CYL=new THREE.CylinderGeometry(1,1,1,18),SPH=new THREE.SphereGeometry(1,16,12),BOX=new THREE.BoxGeometry(1,1,1),UP=new THREE.Vector3(0,1,0);
+  const floor=new THREE.Mesh(new THREE.CircleGeometry(190,48),new THREE.MeshStandardMaterial({color:cv('--bd')||'#262e3b',roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-.5;scene.add(floor);
+  const mk=(r,sz,m)=>{const g=new THREE.Group(),c=new THREE.Mesh(CYL,m),a=new THREE.Mesh(SPH,m),b=new THREE.Mesh(SPH,m);g.add(c,a,b);g.userData={r,sz,c,a,b};scene.add(g);return g};
+  const V=(P,z=0)=>new THREE.Vector3(P[0]-150,204-P[1],z),put=(g,a,b)=>{const{r,sz,c,a:s1,b:s2}=g.userData,d=b.clone().sub(a),len=Math.max(d.length(),.01);c.position.copy(a).add(b).multiplyScalar(.5);c.quaternion.setFromUnitVectors(UP,d.clone().normalize());c.scale.set(r,len,r*sz);s1.position.copy(a);s2.position.copy(b);s1.scale.set(r,r,r*sz);s2.scale.set(r,r,r*sz)};
+  const torso=mk(11,1.5,mat),thN=mk(7,1,mat),shN=mk(5.5,1,mat),thF=mk(7,1,far),shF=mk(5.5,1,far),uaN=mk(4.8,1,mat),faN=mk(4,1,mat),uaF=mk(4.8,1,far),faF=mk(4,1,far),ftN=mk(3.5,1,mat),ftF=mk(3.5,1,far);
+  const head=new THREE.Mesh(SPH,mat);head.scale.set(11,12,10);scene.add(head);
+  const hl={th:[thN,thF],sh:[shN,shF],ua:[uaN,uaF],fa:[faN,faF]},ov={};
+  const mkov=(k,r,sz)=>{ov[k]=mk(r+1.3,sz,red)};
+  ex.hl.forEach(k=>{if(k==='torso')mkov('torso',11,1.5);else if(k==='l2')mkov('l2a',7,1),mkov('l2b',5.5,1);else{mkov(k+'N',{th:7,sh:5.5,ua:4.8,fa:4}[k],1);mkov(k+'F',{th:7,sh:5.5,ua:4.8,fa:4}[k],1)}});
+  /* equipo */
+  const items=S3[ex.id]||[],dyn=[];
+  items.forEach(it=>{const k=Array.isArray(it)?it[0]:it;
+    if(k==='box'){const[,x,y,w,h,d]=it,m=new THREE.Mesh(BOX,gear);m.scale.set(w,h,d);m.position.set(x-150+w/2,204-(y+h/2),0);scene.add(m)}
+    else if(k==='tower'){const[,x,y0]=it,w=26,h=204-y0;let m=new THREE.Mesh(BOX,gear);m.scale.set(w,h,40);m.position.set(x-150+w/2,204-(y0+h/2),0);scene.add(m);
+      [[y0+14,60],[y0+78,60]].forEach(([y,hh],i)=>{const s=new THREE.Mesh(BOX,i?dark:steel);s.scale.set(18,hh,44);s.position.set(x-150+13,204-(y+hh/2),0);scene.add(s)})}
+    else if(k==='cable'){const g=mk(.9,1,steel),bar=new THREE.Mesh(CYL,steel);bar.rotation.x=Math.PI/2;bar.scale.set(2,46,2);scene.add(bar);dyn.push(J=>{put(g,V(J.hnd),V([it[1],it[2]]));bar.position.copy(V(J.hnd))})}
+    else if(k==='dumb'){[15,-15].forEach(z=>{const m=new THREE.Mesh(SPH,steel);m.scale.set(7,7,7);scene.add(m);dyn.push(J=>m.position.copy(V(J.hnd,z)))})}
+    else if(k==='bar'){const bar=new THREE.Mesh(CYL,steel);bar.rotation.x=Math.PI/2;bar.scale.set(1.8,84,1.8);scene.add(bar);
+      const pl=[30,-30].map(()=>{const m=new THREE.Mesh(CYL,dark);m.rotation.x=Math.PI/2;m.scale.set(12,4,12);scene.add(m);return m});
+      dyn.push(J=>{bar.position.copy(V(J.hnd));pl[0].position.copy(V(J.hnd,32));pl[1].position.copy(V(J.hnd,-32))})}
+  });
+  let az=.6,el=.2,drag=null,user=false;
+  cvs.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];user=true;try{cvs.setPointerCapture(e.pointerId)}catch(x){}});
+  cvs.addEventListener('pointermove',e=>{if(!drag)return;az-=(e.clientX-drag[0])*.012;el=Math.min(1.25,Math.max(-.05,el+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY]});
+  ['pointerup','pointercancel'].forEach(n=>cvs.addEventListener(n,()=>{drag=null}));
+  const t0=performance.now(),reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+  (function f(now){
+    if(id!==animId||!document.body.contains(cvs)||!sheetOpen()){renderer.dispose();try{renderer.forceContextLoss()}catch(e){}return}
+    const T=(now-t0)/1000,per=ex.static?4:3.6,ph=(T%per)/per,p=reduce?1:.5-.5*Math.cos(2*Math.PI*ph);
+    const J=solve(mixPose(ex.A,ex.B,p),ex),act=.3+.65*p;red.opacity=act;
+    put(torso,V(J.hip),V(J.sho));head.position.copy(V(J.head));
+    const Hz=8,Sz=15,ank2=J.ank2||J.ank,kn2=J.knee2||J.knee;
+    put(thN,V(J.hip,Hz),V(J.knee,Hz));put(shN,V(J.knee,Hz),V(J.ank,Hz));put(ftN,V(J.ank,Hz),V(J.toe,Hz));
+    put(thF,V(J.hip,-Hz),V(kn2,-Hz));put(shF,V(kn2,-Hz),V(ank2,-Hz));put(ftF,V(ank2,-Hz),V([ank2[0]+(J.toe[0]-J.ank[0]),ank2[1]+(J.toe[1]-J.ank[1])],-Hz));
+    put(uaN,V(J.sho,Sz),V(J.elb,Sz));put(faN,V(J.elb,Sz),V(J.hnd,Sz));put(uaF,V(J.sho,-Sz),V(J.elb,-Sz));put(faF,V(J.elb,-Sz),V(J.hnd,-Sz));
+    if(ov.torso){const a=[J.hip[0]+(J.sho[0]-J.hip[0])*.35,J.hip[1]+(J.sho[1]-J.hip[1])*.35];put(ov.torso,V(a),V(J.sho))}
+    if(ov.thN)put(ov.thN,V(J.hip,Hz),V(J.knee,Hz)),put(ov.thF,V(J.hip,-Hz),V(kn2,-Hz));
+    if(ov.shN)put(ov.shN,V(J.knee,Hz),V(J.ank,Hz)),put(ov.shF,V(kn2,-Hz),V(ank2,-Hz));
+    if(ov.uaN)put(ov.uaN,V(J.sho,Sz),V(J.elb,Sz)),put(ov.uaF,V(J.sho,-Sz),V(J.elb,-Sz));
+    if(ov.faN)put(ov.faN,V(J.elb,Sz),V(J.hnd,Sz)),put(ov.faF,V(J.elb,-Sz),V(J.hnd,-Sz));
+    if(ov.l2a)put(ov.l2a,V(J.hip,-Hz),V(kn2,-Hz)),put(ov.l2b,V(kn2,-Hz),V(ank2,-Hz));
+    dyn.forEach(d=>d(J));
+    const A=user?az:az+.5*Math.sin(T*.45),D=370;cam.position.set(D*Math.sin(A)*Math.cos(el),98+D*Math.sin(el),D*Math.cos(A)*Math.cos(el));cam.lookAt(0,98,0);
+    renderer.render(scene,cam);lab.textContent=ph<.5?ex.lab[0]:ex.lab[1];requestAnimationFrame(f);
+  })(t0);
+}
+
 function howSheet(name,back){
   const ex=animFor(name);
   if(!ex)return`<h3>${esc(name)}</h3><p class="mu">Aún no tengo animación para este ejercicio. Busca “${esc(name)}” en un video corto de un entrenador certificado y empieza ligero.</p>`;
   return`<h3>${esc(name)}</h3><div class="mu sm">Músculos: <b style="color:var(--tx)">${ex.m}</b> <span style="color:#ef4444">● en rojo</span></div>
-  <div class="card" style="padding:6px;margin:10px 0 4px"><svg id="anim" viewBox="0 -12 300 226" width="100%" role="img" aria-label="Animación del ejercicio ${esc(ex.t)}"></svg></div>
+  <div id="modes" style="margin-top:10px"><span class="chip ${mode3?'on':''}" data-act="mode:3d">3D · arrastra para girar</span><span class="chip ${mode3?'':'on'}" data-act="mode:2d">2D</span></div><div class="card" style="padding:6px;margin:6px 0 4px"><div id="anim3" style="min-height:120px"></div><svg id="anim" viewBox="0 -12 300 226" width="100%" role="img" aria-label="Animación del ejercicio ${esc(ex.t)}" style="display:none"></svg></div>
   <div id="animlab" class="sm" style="text-align:center;font-weight:650;color:var(--ac);min-height:20px"></div>
   <h2 style="margin-top:14px">Cómo hacerlo</h2>${ex.cues.map((c,i)=>`<div class="tip"><span>${i+1}</span><span>${c}</span></div>`).join('')}
-  <p class="sm mu">Animación esquemática en vista lateral. Empieza con poco peso y prioriza la técnica.</p>${back?`<button class="btn sec" data-act="sheet:murutina">← Volver a la rutina</button>`:`<button class="btn sec" data-act="close">Cerrar</button>`}`;
+  <p class="sm mu">Modelo esquemático. Empieza con poco peso y prioriza la técnica.</p>${back?`<button class="btn sec" data-act="sheet:murutina">← Volver a la rutina</button>`:`<button class="btn sec" data-act="close">Cerrar</button>`}`;
 }
 
 /* ============ ARRANQUE: atajos de Siri ============ */

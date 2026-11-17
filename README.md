@@ -9,7 +9,7 @@ App web instalable (PWA), sin cuentas ni servidores: tus datos se guardan en tu 
 
 ## Qué incluye
 - **Hoy**: % de cumplimiento diario, racha, menú de 10 accesos (entreno, peso, agua, actividad, comida, sueño, progreso, objetivos, resumen, ajustes), registro de agua en 1 toque y recomendaciones del momento.
-- **Entreno**: **rutina por músculos** (eliges qué trabajar hoy y se genera sola) y plan semanal generado según tus días/tiempo/equipo/objetivo, series con kg y reps, **sugerencia de sobrecarga progresiva**, temporizador de descanso, entreno libre, cardio con calorías estimadas y detección de récords.
+- **Entreno**: botón **▶ Cómo hacerlo** con animación en bucle (músculo en rojo y pasos) en cada ejercicio, **rutina por músculos** (eliges qué trabajar hoy y se genera sola) y plan semanal generado según tus días/tiempo/equipo/objetivo, series con kg y reps, **sugerencia de sobrecarga progresiva**, temporizador de descanso, entreno libre, cardio con calorías estimadas y detección de récords.
 - **Comida**: calorías y proteína con comidas frecuentes de un toque. **Sueño**: horas y calidad. **Pasos**, **peso** y **medidas** con cambios.
 - **Progreso**: gráficas (peso, pasos, agua), resumen semanal y mensual, constancia por día de la semana (detecta tu día más flojo) e historial editable.
 - **Metas**: avance hacia tu peso meta y fecha estimada, metas de rendimiento (p. ej. sentadilla 100 kg), récords personales.

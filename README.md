@@ -26,3 +26,6 @@ Atajos recomendados (app Atajos → *Abrir URLs*):
 - **Recordatorios**: automatizaciones por hora (10:00 agua, 17:30 entreno, 21:30 revisar el día) con *Mostrar notificación*.
 
 > Nota: iOS no permite que una web lea Apple Salud directamente; el puente son los Atajos.
+
+## Modelo 3D
+Los ejercicios se animan con el modelo humano **Superhero Male** de [Quaternius](https://quaternius.itch.io/universal-base-characters), licencia **CC0** (ver `docs/models/LICENSE.md`). Si el modelo no carga, la app usa un maniquí simple como respaldo.

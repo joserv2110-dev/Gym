@@ -599,6 +599,7 @@ const ANIM={
   cues:['Codos pegados al cuerpo, no se mueven.','Estira los brazos hasta abajo apretando el tríceps.','Sube hasta ~90° de codo, controlado.','No balancees el torso.']}
 };
 Object.keys(ANIM).forEach(k=>{ANIM[k].id=k});
+ANIM.pierna.gnd=['spine_01','spine_01',12];
 const ANIMMAP=[[/zancada|búlgara|step/i,'zancada'],[/sentadilla|prensa|cuádriceps|goblet/i,'sentadilla'],[/pica|flexiones|fondos/i,'flexiones'],
  [/curl femoral|peso muerto|buenos días/i,'pesomuerto'],[/curl/i,'curl'],[/press militar|press de hombro/i,'pressmilitar'],[/press|aperturas|pullover/i,'pressbanca'],
  [/jalón|dominadas/i,'jalon'],[/remo|face pull|pájaros|superman/i,'remo'],[/elevaciones laterales|elevaciones frontales|elevación lateral/i,'elevacion'],
@@ -648,12 +649,94 @@ function playAnim(ex){
   })(t0);
 }
 function syncModes(){document.querySelectorAll('#modes .chip').forEach((c,i)=>c.classList.toggle('on',(i===0)===mode3))}
+
+/* ---------- Modelo humano (Quaternius "Superhero Male", CC0) ---------- */
+let MODEL=null;
+function loadModel(){
+  if(!MODEL)MODEL=fetch('models/male.glb').then(r=>{if(!r.ok)throw new Error('modelo');return r.arrayBuffer()}).then(parseGLB).catch(e=>{MODEL=null;throw e});
+  return MODEL;
+}
+function parseGLB(buf){
+  const dv=new DataView(buf);let off=12,json,bin;
+  while(off<buf.byteLength){const len=dv.getUint32(off,true),type=dv.getUint32(off+4,true),data=buf.slice(off+8,off+8+len);
+    if(type===0x4E4F534A)json=JSON.parse(new TextDecoder().decode(data));else if(type===0x004E4942)bin=data;off+=8+len}
+  return{json,bin};
+}
+function readAcc(G,i){
+  const a=G.json.accessors[i],bv=G.json.bufferViews[a.bufferView],n={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16}[a.type];
+  const CT={5120:Int8Array,5121:Uint8Array,5122:Int16Array,5123:Uint16Array,5125:Uint32Array,5126:Float32Array}[a.componentType],bs=CT.BYTES_PER_ELEMENT;
+  const base=(bv.byteOffset||0)+(a.byteOffset||0),stride=bv.byteStride||n*bs,out=new CT(a.count*n);
+  if(stride===n*bs)out.set(new CT(G.bin.slice(base,base+a.count*n*bs)));
+  else{const dv=new DataView(G.bin),get={5120:'getInt8',5121:'getUint8',5122:'getInt16',5123:'getUint16',5125:'getUint32',5126:'getFloat32'}[a.componentType];
+    for(let k=0;k<a.count;k++)for(let c=0;c<n;c++)out[k*n+c]=dv[get](base+k*stride+c*bs,true)}
+  if(a.normalized){const m={5121:255,5123:65535,5120:127,5122:32767}[a.componentType],f=new Float32Array(out.length);for(let k=0;k<out.length;k++)f[k]=Math.max(out[k]/m,-1);return f}
+  return out;
+}
+const HLJ={th:['thigh_','pelvis'],sh:['calf_'],ua:['upperarm_','clavicle_'],fa:['lowerarm_'],l2:['thigh_l','calf_l']};
+function buildSkinned(scene,ex,G,col,uAct){
+  const J=G.json,skin=J.skins[0],joint=new Set(skin.joints),V3=THREE.Vector3,Q=THREE.Quaternion;
+  const nodes=J.nodes.map((n,i)=>{const o=joint.has(i)?new THREE.Bone():new THREE.Object3D();o.name=n.name||('n'+i);
+    if(n.matrix)new THREE.Matrix4().fromArray(n.matrix).decompose(o.position,o.quaternion,o.scale);
+    else{if(n.translation)o.position.fromArray(n.translation);if(n.rotation)o.quaternion.fromArray(n.rotation);if(n.scale)o.scale.fromArray(n.scale)}return o});
+  J.nodes.forEach((n,i)=>(n.children||[]).forEach(c=>nodes[i].add(nodes[c])));
+  const rig=new THREE.Group();J.scenes[J.scene||0].nodes.forEach(i=>rig.add(nodes[i]));scene.add(rig);
+  const bones=skin.joints.map(i=>nodes[i]),ibm=readAcc(G,skin.inverseBindMatrices),inv=bones.map((b,k)=>new THREE.Matrix4().fromArray(ibm,k*16));
+  const skel=new THREE.Skeleton(bones,inv);
+  /* resaltado: peso de cada vértice sobre los huesos del músculo */
+  const absEx=['plancha','crunch','pierna'].includes(ex.id),set=[];
+  ex.hl.forEach(k=>{if(k==='torso')set.push(...(absEx?['spine_01','pelvis']:['spine_02','spine_03','clavicle_']));else set.push(...(HLJ[k]||[]))});
+  const hot=bones.map(b=>set.some(s=>b.name.startsWith(s)||b.name===s)?1:0);
+  const mat=new THREE.MeshStandardMaterial({color:col,roughness:.55,metalness:.04});
+  mat.onBeforeCompile=sh=>{sh.uniforms.uAct=uAct;
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aHL;varying float vHL;').replace('#include <begin_vertex>','#include <begin_vertex>\nvHL=aHL;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vHL;uniform float uAct;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb=mix(diffuseColor.rgb,vec3(.94,.27,.27),clamp(vHL*uAct,0.,1.));')};
+  const meshes=[];
+  J.nodes.forEach((n,i)=>{if(n.mesh===undefined||n.skin===undefined)return;
+    J.meshes[n.mesh].primitives.forEach(pr=>{
+      const g=new THREE.BufferGeometry(),A=pr.attributes,pos=readAcc(G,A.POSITION),ji=readAcc(G,A.JOINTS_0),jw=readAcc(G,A.WEIGHTS_0),hl=new Float32Array(pos.length/3);
+      g.setAttribute('position',new THREE.BufferAttribute(pos,3));if(A.NORMAL!==undefined)g.setAttribute('normal',new THREE.BufferAttribute(readAcc(G,A.NORMAL),3));
+      g.setAttribute('skinIndex',new THREE.BufferAttribute(new Uint16Array(ji),4));g.setAttribute('skinWeight',new THREE.BufferAttribute(jw,4));
+      for(let v=0;v<hl.length;v++){let s=0;for(let c=0;c<4;c++)s+=jw[v*4+c]*hot[ji[v*4+c]];hl[v]=Math.min(1,s)}
+      g.setAttribute('aHL',new THREE.BufferAttribute(hl,1));
+      if(pr.indices!==undefined){const ix=readAcc(G,pr.indices);g.setIndex(new THREE.BufferAttribute(ix,1))}
+      const m=new THREE.SkinnedMesh(g,mat);m.frustumCulled=false;nodes[i].add(m);meshes.push(m)})});
+  rig.updateMatrixWorld(true);
+  meshes.forEach(m=>m.bind(skel,m.matrixWorld));
+  const B={},rest={};bones.forEach(b=>{B[b.name]=b;const p=new V3(),q=new Q(),s=new V3();b.matrixWorld.decompose(p,q,s);rest[b.name]={p,q}});
+  /* orientación y escala */
+  const dist=(a,b)=>rest[a].p.distanceTo(rest[b].p),sc=84/(dist('thigh_r','calf_r')+dist('calf_r','foot_r'));
+  const fw=rest.ball_r.p.clone().sub(rest.foot_r.p);rig.rotation.y=Math.atan2(fw.z,fw.x);rig.scale.setScalar(sc);rig.updateMatrixWorld(true);
+  const S=P=>new V3(P[0]-150,204-P[1],0);
+  const rigQ=()=>rig.quaternion;
+  function setWorld(name,Qw){const b=B[name];b.parent.updateWorldMatrix(true,false);const pq=b.parent.getWorldQuaternion(new Q());b.quaternion.copy(pq.invert().multiply(Qw));b.updateWorldMatrix(false,false)}
+  function aim(name,child,dir){const d0=rest[child].p.clone().sub(rest[name].p).normalize().applyQuaternion(rigQ()),dq=new Q().setFromUnitVectors(d0,dir);setWorld(name,dq.clone().multiply(rigQ().clone().multiply(rest[name].q)));return dq}
+  function follow(name,dq){setWorld(name,dq.clone().multiply(rigQ().clone().multiply(rest[name].q)))}
+  const gnd=ex.gnd||['ball_r','ball_l',3],gOff=gnd[2];
+  const hn=new V3(),hf=new V3();
+  return{rig,pose(Jt,H){
+    const dir=(a,b)=>S(b).sub(S(a)).normalize(),pel=B.pelvis;
+    rig.position.y=rig.position.y||0;rig.updateMatrixWorld(true);
+    pel.parent.updateWorldMatrix(true,false);pel.position.copy(pel.parent.worldToLocal(S(Jt.hip)));
+    const dT=dir(Jt.hip,Jt.sho);
+    aim('pelvis','spine_01',dT);aim('spine_01','spine_02',dT);aim('spine_02','spine_03',dT);const dq3=aim('spine_03','neck_01',dT);const dqn=aim('neck_01','Head',dT);follow('Head',dqn);
+    const dUA=dir(Jt.sho,Jt.elb),dFA=dir(Jt.elb,Jt.hnd);
+    ['r','l'].forEach(sd=>{
+      follow('clavicle_'+sd,dq3);aim('upperarm_'+sd,'lowerarm_'+sd,dUA);const fq=aim('lowerarm_'+sd,'hand_'+sd,dFA);follow('hand_'+sd,fq);
+      const kn=sd==='l'&&Jt.knee2?Jt.knee2:Jt.knee,an=sd==='l'&&Jt.ank2?Jt.ank2:Jt.ank,toe=sd==='l'&&Jt.ank2?[an[0]+Jt.toe[0]-Jt.ank[0],an[1]+Jt.toe[1]-Jt.ank[1]]:Jt.toe;
+      aim('thigh_'+sd,'calf_'+sd,dir(Jt.hip,kn));aim('calf_'+sd,'foot_'+sd,dir(kn,an));const ft=aim('foot_'+sd,'ball_'+sd,dir(an,toe));follow('ball_'+sd,ft)});
+    rig.updateMatrixWorld(true);
+    const gy=[B[gnd[0]],B[gnd[1]]].map(b=>b.getWorldPosition(new V3()).y);
+    rig.position.y+=gOff-Math.min(...gy);rig.updateMatrixWorld(true);
+    B.hand_r.getWorldPosition(hn);B.hand_l.getWorldPosition(hf);H.n.copy(hn);H.f.copy(hf);H.mid.copy(hn).add(hf).multiplyScalar(.5);
+  }};
+}
+
 function run3D(ex,host,id){
   host.innerHTML='';
-  const W=host.clientWidth||340,H=Math.round(W*.8),lab=document.getElementById('animlab');
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.setSize(W,H);
+  const W=host.clientWidth||340,H3=Math.round(W*.8),lab=document.getElementById('animlab');
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.setSize(W,H3);
   const cvs=renderer.domElement;cvs.style.cssText='width:100%;display:block;touch-action:none;border-radius:12px';host.appendChild(cvs);
-  const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(34,W/H,1,2000);
+  const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(34,W/H3,1,2000);
   scene.add(new THREE.HemisphereLight(0xffffff,0x556070,1));const dl=new THREE.DirectionalLight(0xffffff,.85);dl.position.set(160,320,220);scene.add(dl);
   const cs=getComputedStyle(document.documentElement),cv=n=>cs.getPropertyValue(n).trim();
   const fig=cv('--fig')||'#aab4c3',mat=new THREE.MeshStandardMaterial({color:fig,roughness:.55,metalness:.05}),far=new THREE.MeshStandardMaterial({color:new THREE.Color(fig).multiplyScalar(.72),roughness:.6});
@@ -661,47 +744,56 @@ function run3D(ex,host,id){
   const gear=new THREE.MeshStandardMaterial({color:0x64748b,roughness:.6}),dark=new THREE.MeshStandardMaterial({color:0x334155,roughness:.6}),steel=new THREE.MeshStandardMaterial({color:0x475569,metalness:.3,roughness:.4});
   const CYL=new THREE.CylinderGeometry(1,1,1,18),SPH=new THREE.SphereGeometry(1,16,12),BOX=new THREE.BoxGeometry(1,1,1),UP=new THREE.Vector3(0,1,0);
   const floor=new THREE.Mesh(new THREE.CircleGeometry(190,48),new THREE.MeshStandardMaterial({color:cv('--bd')||'#262e3b',roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-.5;scene.add(floor);
+  const V=(P,z=0)=>new THREE.Vector3(P[0]-150,204-P[1],z);
   const mk=(r,sz,m)=>{const g=new THREE.Group(),c=new THREE.Mesh(CYL,m),a=new THREE.Mesh(SPH,m),b=new THREE.Mesh(SPH,m);g.add(c,a,b);g.userData={r,sz,c,a,b};scene.add(g);return g};
-  const V=(P,z=0)=>new THREE.Vector3(P[0]-150,204-P[1],z),put=(g,a,b)=>{const{r,sz,c,a:s1,b:s2}=g.userData,d=b.clone().sub(a),len=Math.max(d.length(),.01);c.position.copy(a).add(b).multiplyScalar(.5);c.quaternion.setFromUnitVectors(UP,d.clone().normalize());c.scale.set(r,len,r*sz);s1.position.copy(a);s2.position.copy(b);s1.scale.set(r,r,r*sz);s2.scale.set(r,r,r*sz)};
-  const torso=mk(11,1.5,mat),thN=mk(7,1,mat),shN=mk(5.5,1,mat),thF=mk(7,1,far),shF=mk(5.5,1,far),uaN=mk(4.8,1,mat),faN=mk(4,1,mat),uaF=mk(4.8,1,far),faF=mk(4,1,far),ftN=mk(3.5,1,mat),ftF=mk(3.5,1,far);
-  const head=new THREE.Mesh(SPH,mat);head.scale.set(11,12,10);scene.add(head);
-  const hl={th:[thN,thF],sh:[shN,shF],ua:[uaN,uaF],fa:[faN,faF]},ov={};
-  const mkov=(k,r,sz)=>{ov[k]=mk(r+1.3,sz,red)};
-  ex.hl.forEach(k=>{if(k==='torso')mkov('torso',11,1.5);else if(k==='l2')mkov('l2a',7,1),mkov('l2b',5.5,1);else{mkov(k+'N',{th:7,sh:5.5,ua:4.8,fa:4}[k],1);mkov(k+'F',{th:7,sh:5.5,ua:4.8,fa:4}[k],1)}});
-  /* equipo */
+  const put=(g,a,b)=>{const{r,sz,c,a:s1,b:s2}=g.userData,d=b.clone().sub(a),len=Math.max(d.length(),.01);c.position.copy(a).add(b).multiplyScalar(.5);c.quaternion.setFromUnitVectors(UP,d.clone().normalize());c.scale.set(r,len,r*sz);s1.position.copy(a);s2.position.copy(b);s1.scale.set(r,r,r*sz);s2.scale.set(r,r,r*sz)};
+  const Hd={n:new THREE.Vector3(),f:new THREE.Vector3(),mid:new THREE.Vector3()};
+  /* equipo (usa las manos reales del modelo) */
   const items=S3[ex.id]||[],dyn=[];
   items.forEach(it=>{const k=Array.isArray(it)?it[0]:it;
     if(k==='box'){const[,x,y,w,h,d]=it,m=new THREE.Mesh(BOX,gear);m.scale.set(w,h,d);m.position.set(x-150+w/2,204-(y+h/2),0);scene.add(m)}
-    else if(k==='tower'){const[,x,y0]=it,w=26,h=204-y0;let m=new THREE.Mesh(BOX,gear);m.scale.set(w,h,40);m.position.set(x-150+w/2,204-(y0+h/2),0);scene.add(m);
+    else if(k==='tower'){const[,x,y0]=it,w=26,h=204-y0,m=new THREE.Mesh(BOX,gear);m.scale.set(w,h,40);m.position.set(x-150+w/2,204-(y0+h/2),0);scene.add(m);
       [[y0+14,60],[y0+78,60]].forEach(([y,hh],i)=>{const s=new THREE.Mesh(BOX,i?dark:steel);s.scale.set(18,hh,44);s.position.set(x-150+13,204-(y+hh/2),0);scene.add(s)})}
-    else if(k==='cable'){const g=mk(.9,1,steel),bar=new THREE.Mesh(CYL,steel);bar.rotation.x=Math.PI/2;bar.scale.set(2,46,2);scene.add(bar);dyn.push(J=>{put(g,V(J.hnd),V([it[1],it[2]]));bar.position.copy(V(J.hnd))})}
-    else if(k==='dumb'){[15,-15].forEach(z=>{const m=new THREE.Mesh(SPH,steel);m.scale.set(7,7,7);scene.add(m);dyn.push(J=>m.position.copy(V(J.hnd,z)))})}
+    else if(k==='cable'){const g=mk(.9,1,steel),bar=new THREE.Mesh(CYL,steel);bar.rotation.x=Math.PI/2;bar.scale.set(2,46,2);scene.add(bar);dyn.push(()=>{put(g,Hd.mid,V([it[1],it[2]]));bar.position.copy(Hd.mid)})}
+    else if(k==='dumb'){['n','f'].forEach(s=>{const m=new THREE.Mesh(SPH,steel);m.scale.set(8,8,8);scene.add(m);dyn.push(()=>m.position.copy(Hd[s]))})}
     else if(k==='bar'){const bar=new THREE.Mesh(CYL,steel);bar.rotation.x=Math.PI/2;bar.scale.set(1.8,84,1.8);scene.add(bar);
-      const pl=[30,-30].map(()=>{const m=new THREE.Mesh(CYL,dark);m.rotation.x=Math.PI/2;m.scale.set(12,4,12);scene.add(m);return m});
-      dyn.push(J=>{bar.position.copy(V(J.hnd));pl[0].position.copy(V(J.hnd,32));pl[1].position.copy(V(J.hnd,-32))})}
+      const pl=[0,1].map(()=>{const m=new THREE.Mesh(CYL,dark);m.rotation.x=Math.PI/2;m.scale.set(12,4,12);scene.add(m);return m});
+      dyn.push(()=>{bar.position.copy(Hd.mid);pl[0].position.copy(Hd.mid).z+=32;pl[1].position.copy(Hd.mid).z-=32})}
   });
+  /* figura de respaldo: maniquí simple */
+  function buildCapsule(){
+    const torso=mk(11,1.5,mat),thN=mk(7,1,mat),shN=mk(5.5,1,mat),thF=mk(7,1,far),shF=mk(5.5,1,far),uaN=mk(4.8,1,mat),faN=mk(4,1,mat),uaF=mk(4.8,1,far),faF=mk(4,1,far),ftN=mk(3.5,1,mat),ftF=mk(3.5,1,far);
+    const head=new THREE.Mesh(SPH,mat);head.scale.set(11,12,10);scene.add(head);const ov={};
+    const mkov=(k,r,sz)=>{ov[k]=mk(r+1.3,sz,red)},R={th:7,sh:5.5,ua:4.8,fa:4};
+    ex.hl.forEach(k=>{if(k==='torso')mkov('torso',11,1.5);else if(k==='l2')mkov('l2a',7,1),mkov('l2b',5.5,1);else{mkov(k+'N',R[k],1);mkov(k+'F',R[k],1)}});
+    return{pose(J,Hh){
+      put(torso,V(J.hip),V(J.sho));head.position.copy(V(J.head));
+      const Hz=8,Sz=15,ank2=J.ank2||J.ank,kn2=J.knee2||J.knee;
+      put(thN,V(J.hip,Hz),V(J.knee,Hz));put(shN,V(J.knee,Hz),V(J.ank,Hz));put(ftN,V(J.ank,Hz),V(J.toe,Hz));
+      put(thF,V(J.hip,-Hz),V(kn2,-Hz));put(shF,V(kn2,-Hz),V(ank2,-Hz));put(ftF,V(ank2,-Hz),V([ank2[0]+(J.toe[0]-J.ank[0]),ank2[1]+(J.toe[1]-J.ank[1])],-Hz));
+      put(uaN,V(J.sho,Sz),V(J.elb,Sz));put(faN,V(J.elb,Sz),V(J.hnd,Sz));put(uaF,V(J.sho,-Sz),V(J.elb,-Sz));put(faF,V(J.elb,-Sz),V(J.hnd,-Sz));
+      if(ov.torso){const a=[J.hip[0]+(J.sho[0]-J.hip[0])*.35,J.hip[1]+(J.sho[1]-J.hip[1])*.35];put(ov.torso,V(a),V(J.sho))}
+      if(ov.thN)put(ov.thN,V(J.hip,Hz),V(J.knee,Hz)),put(ov.thF,V(J.hip,-Hz),V(kn2,-Hz));
+      if(ov.shN)put(ov.shN,V(J.knee,Hz),V(J.ank,Hz)),put(ov.shF,V(kn2,-Hz),V(ank2,-Hz));
+      if(ov.uaN)put(ov.uaN,V(J.sho,Sz),V(J.elb,Sz)),put(ov.uaF,V(J.sho,-Sz),V(J.elb,-Sz));
+      if(ov.faN)put(ov.faN,V(J.elb,Sz),V(J.hnd,Sz)),put(ov.faF,V(J.elb,-Sz),V(J.hnd,-Sz));
+      if(ov.l2a)put(ov.l2a,V(J.hip,-Hz),V(kn2,-Hz)),put(ov.l2b,V(kn2,-Hz),V(ank2,-Hz));
+      Hd.n.copy(V(J.hnd,Sz));Hd.f.copy(V(J.hnd,-Sz));Hd.mid.copy(V(J.hnd,0));
+    }};
+  }
+  const uAct={value:.3};
+  let fig3=null,failed=false;
   let az=.6,el=.2,drag=null,user=false;
   cvs.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];user=true;try{cvs.setPointerCapture(e.pointerId)}catch(x){}});
   cvs.addEventListener('pointermove',e=>{if(!drag)return;az-=(e.clientX-drag[0])*.012;el=Math.min(1.25,Math.max(-.05,el+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY]});
   ['pointerup','pointercancel'].forEach(n=>cvs.addEventListener(n,()=>{drag=null}));
+  loadModel().then(G=>{if(id!==animId)return;try{fig3=buildSkinned(scene,ex,G,fig,uAct)}catch(e){console.warn(e);fig3=buildCapsule()}}).catch(()=>{if(id===animId)fig3=buildCapsule()});
   const t0=performance.now(),reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
   (function f(now){
     if(id!==animId||!document.body.contains(cvs)||!sheetOpen()){renderer.dispose();try{renderer.forceContextLoss()}catch(e){}return}
     const T=(now-t0)/1000,per=ex.static?4:3.6,ph=(T%per)/per,p=reduce?1:.5-.5*Math.cos(2*Math.PI*ph);
-    const J=solve(mixPose(ex.A,ex.B,p),ex),act=.3+.65*p;red.opacity=act;
-    put(torso,V(J.hip),V(J.sho));head.position.copy(V(J.head));
-    const Hz=8,Sz=15,ank2=J.ank2||J.ank,kn2=J.knee2||J.knee;
-    put(thN,V(J.hip,Hz),V(J.knee,Hz));put(shN,V(J.knee,Hz),V(J.ank,Hz));put(ftN,V(J.ank,Hz),V(J.toe,Hz));
-    put(thF,V(J.hip,-Hz),V(kn2,-Hz));put(shF,V(kn2,-Hz),V(ank2,-Hz));put(ftF,V(ank2,-Hz),V([ank2[0]+(J.toe[0]-J.ank[0]),ank2[1]+(J.toe[1]-J.ank[1])],-Hz));
-    put(uaN,V(J.sho,Sz),V(J.elb,Sz));put(faN,V(J.elb,Sz),V(J.hnd,Sz));put(uaF,V(J.sho,-Sz),V(J.elb,-Sz));put(faF,V(J.elb,-Sz),V(J.hnd,-Sz));
-    if(ov.torso){const a=[J.hip[0]+(J.sho[0]-J.hip[0])*.35,J.hip[1]+(J.sho[1]-J.hip[1])*.35];put(ov.torso,V(a),V(J.sho))}
-    if(ov.thN)put(ov.thN,V(J.hip,Hz),V(J.knee,Hz)),put(ov.thF,V(J.hip,-Hz),V(kn2,-Hz));
-    if(ov.shN)put(ov.shN,V(J.knee,Hz),V(J.ank,Hz)),put(ov.shF,V(kn2,-Hz),V(ank2,-Hz));
-    if(ov.uaN)put(ov.uaN,V(J.sho,Sz),V(J.elb,Sz)),put(ov.uaF,V(J.sho,-Sz),V(J.elb,-Sz));
-    if(ov.faN)put(ov.faN,V(J.elb,Sz),V(J.hnd,Sz)),put(ov.faF,V(J.elb,-Sz),V(J.hnd,-Sz));
-    if(ov.l2a)put(ov.l2a,V(J.hip,-Hz),V(kn2,-Hz)),put(ov.l2b,V(kn2,-Hz),V(ank2,-Hz));
-    dyn.forEach(d=>d(J));
-    const A=user?az:az+.5*Math.sin(T*.45),D=370;cam.position.set(D*Math.sin(A)*Math.cos(el),98+D*Math.sin(el),D*Math.cos(A)*Math.cos(el));cam.lookAt(0,98,0);
+    if(fig3){const J=solve(mixPose(ex.A,ex.B,p),ex);red.opacity=.3+.65*p;uAct.value=.35+.6*p;fig3.pose(J,Hd);dyn.forEach(d=>d())}
+    const A=user?az:az+.5*Math.sin(T*.45),D=330;cam.position.set(D*Math.sin(A)*Math.cos(el),92+D*Math.sin(el),D*Math.cos(A)*Math.cos(el));cam.lookAt(0,92,0);
     renderer.render(scene,cam);lab.textContent=ph<.5?ex.lab[0]:ex.lab[1];requestAnimationFrame(f);
   })(t0);
 }

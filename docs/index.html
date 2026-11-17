@@ -120,6 +120,28 @@ const SPLITS={
  5:[['Empuje',['push','push','push','core']],['Tirón',['pull','pull','pull','core']],['Pierna',['legs','legs','legs','core']],['Torso',['push','pull','push','pull']],['Pierna y core',['legs','legs','legs','core']]]
 };
 const isTime=n=>/^Plancha/.test(n);
+
+/* ---- Rutina por músculos ---- */
+const MU={
+ pecho:{n:'Pecho',gym:['Press banca','Press inclinado con mancuernas','Aperturas en polea','Fondos asistidos'],manc:['Press con mancuernas','Press inclinado con mancuernas','Aperturas','Pullover'],nada:['Flexiones','Flexiones inclinadas','Flexiones declinadas','Flexiones diamante']},
+ espalda:{n:'Espalda',gym:['Jalón al pecho','Remo con barra','Remo en polea','Remo con mancuerna'],manc:['Remo con mancuerna','Remo inclinado','Pullover','Pájaros'],nada:['Remo invertido bajo mesa','Superman','Remo con mochila','Dominadas australianas']},
+ hombro:{n:'Hombros',gym:['Press militar con mancuernas','Elevaciones laterales','Pájaros en máquina','Face pull'],manc:['Press de hombro','Elevaciones laterales','Elevaciones frontales','Pájaros'],nada:['Flexiones pica','Flexiones pica con pies elevados','Elevaciones laterales con mochila','Plancha con toque de hombro']},
+ biceps:{n:'Bíceps',gym:['Curl de bíceps con barra','Curl con mancuernas','Curl martillo','Curl en polea'],manc:['Curl con mancuernas','Curl martillo','Curl concentrado','Curl alterno'],nada:['Curl con mochila','Curl isométrico con toalla','Remo supino bajo mesa','Curl con banda o mochila lenta']},
+ triceps:{n:'Tríceps',gym:['Extensión de tríceps en polea','Press cerrado','Fondos asistidos','Press francés'],manc:['Extensión de tríceps','Patada de tríceps','Press francés con mancuerna','Fondos en silla'],nada:['Fondos en silla','Flexiones diamante','Extensión de tríceps con mochila','Flexiones cerradas']},
+ cuadriceps:{n:'Cuádriceps',gym:['Sentadilla','Prensa de piernas','Extensión de cuádriceps','Zancadas'],manc:['Sentadilla goblet','Zancadas','Sentadilla búlgara','Sentadilla con salto'],nada:['Sentadilla','Zancadas','Sentadilla búlgara','Sentadilla con pausa']},
+ femoral:{n:'Femoral y glúteo',gym:['Peso muerto rumano','Curl femoral','Hip thrust','Patada de glúteo en polea'],manc:['Peso muerto rumano con mancuernas','Puente de glúteo con peso','Buenos días','Step-up'],nada:['Puente de glúteo','Puente a una pierna','Peso muerto a una pierna','Curl femoral con toalla']},
+ core:{n:'Core',gym:['Plancha','Elevación de piernas','Crunch en polea','Rueda abdominal'],manc:['Plancha','Russian twist','Crunch','Elevación de piernas'],nada:['Plancha','Elevación de piernas','Crunch','Bicicleta abdominal']},
+ pantorrilla:{n:'Pantorrillas',gym:['Elevación de talones de pie','Elevación de talones sentado'],manc:['Elevación de talones con mancuerna','Elevación a una pierna'],nada:['Elevación de talones','Elevación a una pierna']}
+};
+const MUORD=['pecho','espalda','cuadriceps','femoral','hombro','biceps','triceps','core','pantorrilla'];
+let muSel=[],muShift=0,muRoutine=null;
+function muscleRoutine(sel,shift){
+  const p=S.perfil,keys=MUORD.filter(k=>sel.includes(k)),N=mx(keys.length,mn(8,mx(3,r0(p.minutos/9))));
+  const cnt={};for(let i=0;i<N;i++){const k=keys[i%keys.length];if(cnt[k]<(MU[k][p.equipo].length)||cnt[k]===undefined)cnt[k]=(cnt[k]||0)+1}
+  const rr=p.objetivo==='rendimiento'?'5-8':p.objetivo==='perder'?'10-15':'8-12',sets=p.nivel==='p'?2:3,ex=[];
+  keys.forEach(k=>{const pool=MU[k][p.equipo];for(let j=0;j<cnt[k];j++){const nm=pool[(j+shift)%pool.length];if(!ex.find(e=>e.n===nm))ex.push({n:nm,series:sets,reps:isTime(nm)?'30-60':rr,done:[]})}});
+  return{nombre:keys.map(k=>MU[k].n).join(' + '),ex};
+}
 function sessionFor(date){
   const p=S.perfil;if(!p)return null;
   const ds=[...p.dias].sort((a,b)=>((a+6)%7)-((b+6)%7));
@@ -252,6 +274,7 @@ function vEntreno(){
   return head('Entreno',`${p.dias.length} días · ${p.minutos} min · ${{gym:'Gimnasio',manc:'Mancuernas',nada:'Sin equipo'}[p.equipo]}`)+`
   ${ses?`<div class="card hero"><div class="mu sm">Hoy toca</div><div class="big" style="font-size:24px">${esc(ses.nombre)}</div><div class="sm mu" style="margin:6px 0 12px">${ses.ex.map(e=>esc(e.n)).join(' · ')}</div><button class="btn" data-act="startplan:${t}">▶ Empezar entrenamiento</button></div>`
   :`<div class="card"><b>Hoy descansas 🧘</b><p class="sm mu">Puedes hacer cardio ligero o un entreno libre.</p></div>`}
+  <button class="btn" style="margin:10px 0" data-act="sheet:musculos">💪 Rutina por músculos</button>
   <div class="two"><button class="btn sec" data-act="startfree">➕ Entreno libre</button><button class="btn sec" data-act="sheet:cardio">🏃 Cardio</button></div>
   <h2>Plan de la semana</h2><div class="card">${Array.from({length:7},(_,i)=>{const d=addD(wk,i),s=sessionFor(d),done=dayStats(d).ent;return`<div class="hist"><span><b>${DN[dow(d)]}</b> ${d===t?'· hoy':''}</span><span>${s?esc(s.nombre):'<span class="mu">Descanso</span>'}</span><span>${done?'✅':s&&d<t?'❌':s?'⬜':''}</span></div>`}).join('')}
   <div class="row g8" style="margin-top:10px"><button class="btn sec s" data-act="startplan:pick">Elegir otro día</button></div></div>
@@ -389,7 +412,9 @@ const SH={
  medida:()=>`<h3>📏 Medida corporal</h3><form data-f="medida"><label>Zona</label><select name="zona">${['Cintura','Pecho','Cadera','Brazo','Muslo','Cuello'].map(t=>`<option>${t}</option>`).join('')}</select><label>Centímetros</label><input name="cm" type="number" step="0.1" inputmode="decimal" required><div style="height:14px"></div><button class="btn">Guardar</button></form>`,
  meta:()=>`<h3>🎯 Meta de rendimiento</h3><form data-f="meta"><label>Ejercicio</label><input name="ej" list="exl" placeholder="Sentadilla" required><label>Peso objetivo (kg)</label><input name="kg" type="number" inputmode="decimal" required><div style="height:14px"></div><button class="btn">Guardar</button></form>${exList()}`,
  addex:()=>`<h3>➕ Ejercicio</h3><form data-f="addex"><label>Nombre</label><input name="n" list="exl" required><div class="two"><div><label>Series</label><input name="series" type="number" value="3"></div><div><label>Reps</label><input name="reps" value="8-12"></div></div><div style="height:14px"></div><button class="btn">Añadir</button></form>${exList()}`,
- perfil:()=>vOnboard(true)
+ perfil:()=>vOnboard(true),
+ musculos:()=>`<h3>💪 Rutina por músculos</h3><p class="sm mu">Elige los músculos que quieres trabajar hoy. Adapto ejercicios a tu equipo (${{gym:'gimnasio',manc:'mancuernas',nada:'sin equipo'}[S.perfil.equipo]}) y a tus ${S.perfil.minutos} min.</p><div id="muchips">${MUORD.map(k=>`<span class="chip ${muSel.includes(k)?'on':''}" data-act="mu:${k}">${MU[k].n}</span>`).join('')}</div><div style="height:14px"></div><button class="btn" data-act="genmu">Generar rutina</button>`,
+ murutina:()=>`<h3>${esc(muRoutine.nombre)}</h3><p class="sm mu">${muRoutine.ex.length} ejercicios · ${muRoutine.ex[0].series} series · ${muRoutine.ex[0].reps} reps</p><div class="card" style="margin:8px 0">${muRoutine.ex.map((e,i)=>`<div class="hist"><span>${i+1}. ${esc(e.n)}</span><span class="mu">${e.series}×${e.reps}${isTime(e.n)?' s':''}</span></div>`).join('')}</div><button class="btn" data-act="startmu">▶ Empezar</button><div class="two" style="margin-top:10px"><button class="btn sec" data-act="genmu:next">🔄 Otra variante</button><button class="btn sec" data-act="sheet:musculos">✏️ Cambiar músculos</button></div>`
 };
 function exList(){const all=new Set([...Object.values(EX).flatMap(g=>Object.values(g).flat()),...S.logs.filter(l=>l.type==='set').map(l=>l.ej)]);return`<datalist id="exl">${[...all].map(e=>`<option value="${esc(e)}">`).join('')}</datalist>`}
 /* ============ ACCIONES ============ */
@@ -441,6 +466,9 @@ document.addEventListener('click',e=>{
    case'q':document.querySelectorAll('#q .chip').forEach((c,i)=>c.classList.toggle('on',i+1===+x));document.querySelector('[name=q]').value=x;break;
    case'dia':el.classList.toggle('on');break;
    case'startplan':{if(x==='pick'){sheet(`<h3>Elegir sesión</h3>${Array.from({length:7},(_,i)=>addD(weekStart(today()),i)).filter(d=>sessionFor(d)).map(d=>`<button class="btn sec" style="margin-top:8px" data-act="startplan:${d}">${DNL[dow(d)]} · ${esc(sessionFor(d).nombre)}</button>`).join('')}`);break}closeSheet();startWork(sessionFor(x));break}
+   case'mu':{const i=muSel.indexOf(x);if(i>=0)muSel.splice(i,1);else muSel.push(x);el.classList.toggle('on');break}
+   case'genmu':{if(!muSel.length)return toast('Elige al menos un músculo');muShift=x==='next'?muShift+1:0;muRoutine=muscleRoutine(muSel,muShift);sheet(SH.murutina());break}
+   case'startmu':closeSheet();startWork(muRoutine);break;
    case'startfree':startWork({nombre:'Entreno libre',ex:[]});break;
    case'delset':{const w=S.work;w.ex[+x].done.splice(+y,1);save();render();break}
    case'cancelwork':if(ask(el,'¿Seguro? Toca otra vez')){S.work=null;S.restEnd=0;save();render()}break;

@@ -75,6 +75,11 @@ nav button{flex:1;border:0;border-radius:0;background:transparent;min-height:56p
 nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13.5px;z-index:20;max-width:90vw}
 .spin{color:var(--muted);font-size:13px;padding:8px 0}
+details.card>summary{font-weight:650;font-size:15px;cursor:pointer;min-height:32px;display:flex;align-items:center}
+details.card[open]>summary{margin-bottom:6px}
+nav button{padding:8px 2px;font-size:12px}
+.fl{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:6px 0;font-size:13px}
+.fl code{font-family:var(--mono);font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
 </style>
 
 <div class="wrap">
@@ -140,6 +145,51 @@ nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)
   <div id="unionOut"></div>
 </section>
 
+<section data-view="crear" hidden>
+  <h2>Crear</h2>
+  <p class="msg">Tablas resumen, gráficas y columnas con fórmulas reales de Excel.</p>
+  <div class="card"><h3>Hoja de trabajo</h3><div id="pickT"></div></div>
+
+  <details class="card" open><summary>Tabla resumen</summary>
+    <label class="f" for="tRow">Filas (agrupar por)</label><select id="tRow"></select>
+    <label class="f" for="tCol">Columnas (opcional)</label><select id="tCol"></select>
+    <div class="grid2"><div><label class="f" for="tVal">Valor</label><select id="tVal"></select></div>
+      <div><label class="f" for="tAgg">Operación</label><select id="tAgg"><option value="sum">Suma</option><option value="avg">Promedio</option><option value="count">Conteo</option><option value="max">Máximo</option><option value="min">Mínimo</option></select></div></div>
+    <button class="pri" id="runPivot" style="width:100%;margin-top:12px">Crear tabla</button>
+    <div id="pivotOut"></div>
+  </details>
+
+  <details class="card"><summary>Gráfica</summary>
+    <div class="grid2"><div><label class="f" for="cX">Eje X (categorías)</label><select id="cX"></select></div>
+      <div><label class="f" for="cY">Valor</label><select id="cY"></select></div></div>
+    <div class="grid2"><div><label class="f" for="cAgg">Operación</label><select id="cAgg"><option value="sum">Suma</option><option value="avg">Promedio</option><option value="count">Conteo</option><option value="max">Máximo</option><option value="min">Mínimo</option></select></div>
+      <div><label class="f" for="cType">Tipo</label><select id="cType"><option value="bar">Barras</option><option value="stack">Barras apiladas</option><option value="line">Líneas</option><option value="pie">Pastel</option></select></div></div>
+    <label class="f" for="cS">Dividir en series por (opcional)</label><select id="cS"></select>
+    <button class="pri" id="runChart" style="width:100%;margin-top:12px">Crear gráfica</button>
+    <div id="chartOut"></div>
+  </details>
+
+  <details class="card"><summary>Columnas con fórmulas</summary>
+    <p class="msg">Agrega columnas nuevas a la hoja. El archivo que descargas lleva fórmulas de Excel reales, no solo valores.</p>
+    <label class="f" for="fType">Qué quieres calcular</label>
+    <select id="fType">
+      <option value="calc">Operación entre dos columnas</option>
+      <option value="agg">Suma, promedio, máximo o mínimo de varias columnas</option>
+      <option value="if">Condición SI (si se cumple, un valor; si no, otro)</option>
+      <option value="lookup">Traer un dato de otra hoja (como BUSCARV)</option>
+      <option value="concat">Unir columnas de texto</option>
+    </select>
+    <div id="fLookup" hidden><h3 style="margin-top:12px">Hoja B (donde se busca)</h3><div id="pickF"></div></div>
+    <div id="fBody"></div>
+    <label class="f" for="fName">Nombre de la columna nueva</label><input type="text" id="fName" placeholder="Ej. Total">
+    <button class="pri" id="fAdd" style="width:100%;margin-top:10px">Agregar columna</button>
+    <div id="fList" style="margin-top:8px"></div>
+    <label class="f">Fila de totales al final (opcional)</label><div class="checks" id="fTot"><span class="msg">Elige una hoja de trabajo.</span></div>
+    <button id="fRun" style="width:100%;margin-top:10px">Vista previa y descarga</button>
+    <div id="fOut"></div>
+  </details>
+</section>
+
 <section data-view="revisar" hidden>
   <h2>Revisar datos</h2>
   <p class="msg">Duplicados, celdas vacías y errores (#N/A) de una hoja.</p>
@@ -166,6 +216,7 @@ nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)
   <button data-go="archivos" aria-current="page">Archivos</button>
   <button data-go="cruzar">Cruzar</button>
   <button data-go="pasar">Pasar</button>
+  <button data-go="crear">Crear</button>
   <button data-go="revisar">Revisar</button>
   <button data-go="comando">Comandos</button>
 </nav>
@@ -393,25 +444,61 @@ function findCols(cmd,headers){
     const idx=n.indexOf(' '+hn+' ');if(idx>=0)hits.push({i,s:idx,e:idx+hn.length+1})});
   hits=hits.filter(a=>!hits.some(b=>b!==a&&b.s<=a.s&&b.e>=a.e&&(b.e-b.s)>(a.e-a.s)));
   return hits.sort((a,b)=>a.s-b.s).map(x=>x.i)}
-function aggregate(sd,xj,yj,mode,asc){
+const modeName={sum:'Suma',avg:'Promedio',max:'Máximo',min:'Mínimo',count:'Conteo'};
+const r2=v=>Math.round(v*100)/100;
+function accum(sd,xj,yj,sj){
   const m=new Map();
-  for(const r of sd.rows){const lab=r[xj]==null?'(vacío)':fmt(r[xj]);let e=m.get(lab);if(!e){e={s:0,c:0,n:0};m.set(lab,e)}
-    e.c++;if(yj!=null){const v=toNum(r[yj]);if(!isNaN(v)){e.s+=v;e.n++}}}
-  let arr=[...m.entries()].map(([k,e])=>[k,mode==='count'||yj==null?e.c:mode==='avg'?(e.n?e.s/e.n:0):e.s]);
-  return arr}
+  for(const r of sd.rows){const x=r[xj]==null?'(vacío)':fmt(r[xj]);const s=sj>=0?(r[sj]==null?'(vacío)':fmt(r[sj])):'';
+    let row=m.get(x);if(!row){row=new Map();m.set(x,row)}
+    let e=row.get(s);if(!e){e={s:0,c:0,n:0,mx:-Infinity,mn:Infinity};row.set(s,e)}
+    e.c++;if(yj>=0){const v=toNum(r[yj]);if(!isNaN(v)){e.s+=v;e.n++;if(v>e.mx)e.mx=v;if(v<e.mn)e.mn=v}}}
+  return m}
+const merge=es=>es.reduce((a,e)=>({s:a.s+e.s,c:a.c+e.c,n:a.n+e.n,mx:Math.max(a.mx,e.mx),mn:Math.min(a.mn,e.mn)}),{s:0,c:0,n:0,mx:-Infinity,mn:Infinity});
+const val=(e,mode)=>!e?0:mode==='count'?e.c:mode==='avg'?(e.n?e.s/e.n:0):mode==='max'?(e.n?e.mx:0):mode==='min'?(e.n?e.mn:0):e.s;
+function aggregate(sd,xj,yj,mode){const m=accum(sd,xj,yj==null?-1:yj,-1);return[...m.entries()].map(([k,row])=>[k,val(row.get(''),mode)])}
 function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
-function drawChart(canvas,type,labels,values,title){
+function drawChart(canvas,type,labels,sets,title){
   const pal=[1,2,3,4,5,6].map(i=>cssv('--c'+i));
   const bgp={id:'bgp',beforeDraw(c){const x=c.ctx;x.save();x.globalCompositeOperation='destination-over';x.fillStyle=cssv('--surface');x.fillRect(0,0,c.width,c.height);x.restore()}};
-  const pie=type==='pie';
-  const ch=new Chart(canvas,{type:pie?'doughnut':type,data:{labels,datasets:[{label:title,data:values,
-      backgroundColor:pie?labels.map((_,i)=>pal[i%6]):pal[0],borderColor:pie?cssv('--surface'):pal[0],borderWidth:pie?2:2,pointRadius:type==='line'?2:0,tension:.2}]},
+  const pie=type==='pie',stack=type==='stack',multi=sets.length>1;
+  const ch=new Chart(canvas,{type:pie?'doughnut':(stack?'bar':type),data:{labels,datasets:sets.map((s,i)=>({label:s.label,data:s.data,
+      backgroundColor:pie?labels.map((_,k)=>pal[k%6]):pal[i%6],borderColor:pie?cssv('--surface'):pal[i%6],borderWidth:2,pointRadius:type==='line'?2:0,tension:.2}))},
     options:{responsive:true,maintainAspectRatio:false,animation:false,
-      plugins:{legend:{display:pie,position:'bottom',labels:{color:cssv('--muted'),boxWidth:12,font:{size:11}}},title:{display:true,text:title,color:cssv('--fg'),font:{size:13,weight:'600'}}},
-      scales:pie?{}:{x:{ticks:{color:cssv('--muted'),maxRotation:60,autoSkip:true,font:{size:10}},grid:{color:cssv('--line')}},y:{beginAtZero:true,ticks:{color:cssv('--muted'),font:{size:10}},grid:{color:cssv('--line')}}}},
+      plugins:{legend:{display:pie||multi,position:'bottom',labels:{color:cssv('--muted'),boxWidth:12,font:{size:11}}},title:{display:true,text:title,color:cssv('--fg'),font:{size:13,weight:'600'}}},
+      scales:pie?{}:{x:{stacked:stack,ticks:{color:cssv('--muted'),maxRotation:60,autoSkip:true,font:{size:10}},grid:{color:cssv('--line')}},y:{stacked:stack,beginAtZero:true,ticks:{color:cssv('--muted'),font:{size:10}},grid:{color:cssv('--line')}}}},
     plugins:[bgp]});
-  charts.push(ch);while(charts.length>6){charts.shift().destroy()}
+  charts.push(ch);while(charts.length>8){charts.shift().destroy()}
   return ch}
+/* Devuelve un elemento; al agregarlo a la página, llama a el.draw() */
+function buildChart(o){
+  const {sd,xj,type}=o;let mode=o.mode;const yj=o.yj==null?-1:o.yj;let sj=o.sj==null?-1:o.sj;
+  if(yj<0)mode='count';if(type==='pie')sj=-1;
+  const m=accum(sd,xj,yj,sj);const numX=isNumCol(sd,xj);
+  const tv=x=>val(merge([...m.get(x).values()]),mode);
+  let labels=[...m.keys()];
+  if(type==='line')labels.sort((a,b)=>numX?toNum(a)-toNum(b):String(a).localeCompare(String(b),'es',{numeric:true}));
+  else labels.sort((a,b)=>tv(b)-tv(a));
+  const total=labels.length,lim=type==='line'?80:(type==='stack'?12:15);let notes=[];
+  let others=null;
+  if(total>lim){if(type==='pie')others=merge(labels.slice(lim).map(x=>merge([...m.get(x).values()])));labels=labels.slice(0,lim);notes.push('Mostrando '+lim+' de '+total+' categorías'+(others?' y el resto como “Otros”.':'.'))}
+  let sets;
+  if(sj>=0){const tot=new Map();m.forEach(row=>row.forEach((e,s)=>tot.set(s,(tot.get(s)||[]).concat(e))));
+    let ss=[...tot.keys()].sort((a,b)=>val(merge(tot.get(b)),mode)-val(merge(tot.get(a)),mode));
+    if(ss.length>6){notes.push('Mostrando las 6 series mayores de '+ss.length+'.');ss=ss.slice(0,6)}
+    sets=ss.map(s=>({label:s,data:labels.map(x=>r2(val(m.get(x).get(s),mode)))}))}
+  else{const data=labels.map(x=>r2(tv(x)));if(others){labels=[...labels,'Otros'];data.push(r2(val(others,mode)))}
+    sets=[{label:'',data}]}
+  const xn=sd.headers[xj];
+  const title=(mode==='count'?'Conteo por '+xn:modeName[mode]+' de '+sd.headers[yj]+' por '+xn)+(sj>=0?' y '+sd.headers[sj]:'');
+  sets[0].label=sets[0].label||title;
+  const canvas=h('canvas');
+  const dh=[xn,...sets.map(s=>s.label)],dr=labels.map((x,i)=>[x,...sets.map(s=>s.data[i])]);
+  const el=h('div',null,h('div',{class:'chartbox'},canvas),notes.map(n=>h('p',{class:'msg'},n)),
+    h('div',{class:'row',style:'margin-top:8px'},
+      h('button',{class:'sm',onclick:()=>{if(!dl){toast('Descargar no está disponible aquí');return}canvas.toBlob(b=>dl.save({filename:'grafica.png',data:b}).catch(e=>{if(!e||e.code!=='declined')toast('No se pudo guardar')}))}},'Guardar imagen'),
+      h('button',{class:'sm',onclick:()=>saveXlsx([{name:'Datos',headers:dh,rows:dr}],'datos-grafica.xlsx')},'Datos en Excel')));
+  el.draw=()=>drawChart(canvas,type,labels,sets,title);
+  return el}
 function resCard(q,...kids){const c=h('article',{class:'res'},h('div',{class:'q'},'› '+q),...kids);const r=$('#results');r.prepend(c);while(r.children.length>8)r.lastChild.remove();return c}
 
 async function runCommand(text){
@@ -422,26 +509,11 @@ async function runCommand(text){
   // gráficas
   if(/grafic|chart|barras|pastel|circular|lineas|linea/.test(n)){
     if(!cols.length){resCard(q,h('p',null,'No reconocí ninguna columna. Usa el nombre tal como aparece en la hoja. Toca una para agregarla:'),colList());return}
-    let xj=cols[0],yj=cols[1]!=null?cols[1]:null;
-    if(yj!=null&&isNumCol(sd,xj)&&!isNumCol(sd,yj)){[xj,yj]=[yj,xj]}
-    const type=/pastel|circular|pie/.test(n)?'pie':/linea/.test(n)?'line':'bar';
-    let mode=/promedio|media/.test(n)?'avg':/cuent|conteo|cuantos/.test(n)?'count':'sum';
-    if(yj!=null&&!isNumCol(sd,yj)){mode='count';yj=null}
-    if(yj==null)mode='count';
-    let data=aggregate(sd,xj,yj,mode);
-    const numX=isNumCol(sd,xj);
-    if(type==='line')data.sort((a,b)=>numX?toNum(a[0])-toNum(b[0]):String(a[0]).localeCompare(String(b[0]),'es',{numeric:true}));
-    else data.sort((a,b)=>b[1]-a[1]);
-    const total=data.length,lim=type==='line'?80:15;
-    if(total>lim){if(type==='pie'){const rest=data.slice(lim).reduce((s,d)=>s+d[1],0);data=[...data.slice(0,lim),['Otros',rest]]}else data=data.slice(0,lim)}
-    const verb={sum:'Suma de ',avg:'Promedio de ',count:'Conteo por '}[mode];
-    const title=mode==='count'?'Conteo por '+sd.headers[xj]:verb+sd.headers[yj]+' por '+sd.headers[xj];
-    const canvas=h('canvas');const box=h('div',{class:'chartbox'},canvas);
-    const card=resCard(q,box,total>lim?h('p',{class:'msg'},'Mostrando '+lim+' de '+total+' categorías.'):null,
-      h('div',{class:'row',style:'margin-top:8px'},
-        h('button',{class:'sm',onclick:()=>{if(!dl){toast('Descargar no está disponible aquí');return}canvas.toBlob(b=>dl.save({filename:'grafica.png',data:b}).catch(e=>{if(!e||e.code!=='declined')toast('No se pudo guardar')}))}},'Guardar imagen'),
-        h('button',{class:'sm',onclick:()=>saveXlsx([{name:'Datos',headers:[sd.headers[xj],mode==='count'?'Conteo':sd.headers[yj]],rows:data}],'datos-grafica.xlsx')},'Datos en Excel')));
-    drawChart(canvas,type,data.map(d=>d[0]),data.map(d=>Math.round(d[1]*100)/100),title);return}
+    const cat=cols.filter(j=>!isNumCol(sd,j)),nu=cols.filter(j=>isNumCol(sd,j));
+    const xj=cat.length?cat[0]:cols[0],yj=nu.find(j=>j!==xj),sj=cat.find(j=>j!==xj);
+    const type=/pastel|circular|pie/.test(n)?'pie':/lineas|linea/.test(n)?'line':/apilad/.test(n)?'stack':'bar';
+    const mode=/promedio|media/.test(n)?'avg':/maximo/.test(n)?'max':/minimo/.test(n)?'min':/cuent|conteo|cuantos/.test(n)?'count':'sum';
+    const el=buildChart({sd,xj,yj,sj,mode,type});resCard(q,el);el.draw();return}
   // duplicados
   if(/duplicad|repetid/.test(n)){
     const k=cols.length?cols[0]:0;const g=new Map();
@@ -604,11 +676,157 @@ function setupUnion(){
       h('div',{class:'row',style:'margin-top:10px'},h('button',{class:'pri',onclick:()=>saveXlsx([{name:'Unido',headers,rows:rows.slice(0,1048575)}],'hojas-unidas.xlsx')},'Descargar Excel'))))}
 }
 
+/* ---------- vista Crear (etapa 3) ---------- */
+let pickT,pickF;
+const L=colLetter;
+const optsAll=(sd,none)=>[...(none?[h('option',{value:-1},none)]:[]),...sd.headers.map((x,i)=>h('option',{value:i},L(i)+' · '+x))];
+function setupCreate(){
+  pickT=makePicker($('#pickT'));pickF=makePicker($('#pickF'));
+  pickT.onload=sd=>{
+    const ids=['tRow','tCol','tVal','cX','cY','cS'];
+    if(!sd){ids.forEach(i=>$('#'+i).replaceChildren());$('#fTot').replaceChildren(h('span',{class:'msg'},'Elige una hoja de trabajo.'));fSpecs.length=0;drawFList();renderBody();return}
+    $('#tRow').replaceChildren(...optsAll(sd));$('#cX').replaceChildren(...optsAll(sd));
+    $('#tCol').replaceChildren(...optsAll(sd,'Sin columnas'));$('#cS').replaceChildren(...optsAll(sd,'Sin dividir'));
+    const nums=()=>sd.headers.map((x,i)=>isNumCol(sd,i)?h('option',{value:i},L(i)+' · '+x):null).filter(Boolean);
+    $('#tVal').replaceChildren(h('option',{value:-1},'Contar filas'),...nums());$('#cY').replaceChildren(h('option',{value:-1},'Contar filas'),...nums());
+    $('#fTot').replaceChildren(...sd.headers.map((x,i)=>isNumCol(sd,i)?h('label',null,h('input',{type:'checkbox',value:i}),L(i)+' · '+x):null).filter(Boolean));
+    fSpecs.length=0;drawFList();renderBody()};
+  $('#runPivot').onclick=runPivot;
+  $('#runChart').onclick=()=>{const sd=pickT.sd;if(!sd){toast('Elige una hoja');return}
+    const el=buildChart({sd,xj:+$('#cX').value,yj:+$('#cY').value,sj:+$('#cS').value,mode:$('#cAgg').value,type:$('#cType').value});
+    $('#chartOut').replaceChildren(h('div',{class:'res'},el));el.draw()};
+  setupFormulas();
+}
+function runPivot(){
+  const sd=pickT.sd;if(!sd){toast('Elige una hoja');return}
+  const xj=+$('#tRow').value,sj=+$('#tCol').value,yj=+$('#tVal').value;let mode=$('#tAgg').value;if(yj<0)mode='count';
+  const m=accum(sd,xj,yj,sj);
+  const rowE=x=>merge([...m.get(x).values()]);
+  const xs=[...m.keys()].sort((a,b)=>val(rowE(b),mode)-val(rowE(a),mode));
+  let ss=[];
+  if(sj>=0){const tot=new Map();m.forEach(row=>row.forEach((e,s)=>tot.set(s,(tot.get(s)||[]).concat(e))));
+    ss=[...tot.keys()].sort((a,b)=>val(merge(tot.get(b)),mode)-val(merge(tot.get(a)),mode))}
+  const note=ss.length>30?'Mostrando las 30 columnas mayores de '+ss.length+'. El total incluye todas.':'';ss=ss.slice(0,30);
+  const vl=mode==='count'?'Conteo':modeName[mode]+' de '+sd.headers[yj];
+  const allE=merge(xs.map(rowE));
+  const headers=sj>=0?[sd.headers[xj],...ss,'Total']:[sd.headers[xj],vl];
+  const rows=xs.map(x=>{const row=m.get(x);return sj<0?[x,r2(val(row.get(''),mode))]:[x,...ss.map(s=>row.has(s)?r2(val(row.get(s),mode)):null),r2(val(rowE(x),mode))]});
+  rows.push(sj<0?['Total',r2(val(allE,mode))]:['Total',...ss.map(s=>r2(val(merge(xs.map(x=>m.get(x).get(s)).filter(Boolean)),mode))),r2(val(allE,mode))]);
+  const gout=h('div');
+  $('#pivotOut').replaceChildren(h('div',{style:'margin-top:12px'},
+    h('div',{class:'stat'},h('span',{class:'pill ok'},xs.length+' filas de resumen')),
+    note?h('p',{class:'msg'},note):null,tableEl(headers,rows,200),
+    h('div',{class:'row',style:'margin-top:10px'},
+      h('button',{class:'pri',onclick:()=>saveXlsx([{name:'Resumen',headers,rows}],'tabla-resumen.xlsx')},'Descargar Excel'),
+      h('button',{onclick:()=>{const el=buildChart({sd,xj,yj,sj,mode,type:sj>=0?'stack':'bar'});gout.replaceChildren(h('div',{class:'res'},el));el.draw()}},'Graficar esta tabla')),
+    gout))}
+
+/* Fórmulas */
+const fSpecs=[];
+const sheetSafe=(n,not)=>{let t=String(n).replace(/[\[\]:*?\/\\]/g,'_').slice(0,31)||'Hoja';if(not&&t.toLowerCase()===not.toLowerCase())t=t.slice(0,27)+' (2)';return t};
+const q=t=>'"'+String(t).replace(/"/g,'""')+'"';
+const isNumStr=t=>/^-?\d+(\.\d+)?$/.test(t.trim());
+const lit=t=>isNumStr(t)?String(+t):q(t);
+const jsLit=t=>isNumStr(t)?+t:t;
+const num=v=>typeof v==='number'?v:toNum(v);
+const typedKey=v=>v==null?null:(typeof v==='number'?'n'+v:v instanceof Date?'d'+v.getTime():'s'+String(v).trim().toUpperCase());
+function selCol(sd,id,label,onlyNum){const s=h('select',{id,'aria-label':label});
+  sd.headers.forEach((x,i)=>{if(!onlyNum||isNumCol(sd,i))s.append(h('option',{value:i},L(i)+' · '+x))});return s}
+function checks(sd,onlyNum){const b=h('div',{class:'checks'});
+  sd.headers.forEach((x,i)=>{if(!onlyNum||isNumCol(sd,i))b.append(h('label',null,h('input',{type:'checkbox',value:i}),L(i)+' · '+x))});return b}
+const picked=box=>[...box.querySelectorAll('input:checked')].map(i=>+i.value);
+const FT={
+  calc(sd,box){
+    const a=selCol(sd,'fa','Primera columna',false),op=h('select',{'aria-label':'Operación'},[['+','suma (+)'],['-','resta (−)'],['*','multiplicación (×)'],['/','división (÷)']].map(([v,t])=>h('option',{value:v},t)));
+    const b=selCol(sd,'fb','Segunda columna',false),c=h('input',{type:'text',placeholder:'o un número fijo, ej. 1.16','aria-label':'Número fijo'});
+    box.append(h('label',{class:'f'},'Primera columna'),a,h('label',{class:'f'},'Operación'),op,h('label',{class:'f'},'Segunda columna'),b,h('label',{class:'f'},'O usa un número fijo'),c);
+    return()=>{const ia=+a.value,ib=+b.value,o=op.value,k=c.value.trim();if(k&&!isNumStr(k))throw 'El número fijo no es válido';
+      const kc=k?+k:null;
+      return{desc:L(ia)+' '+o+' '+(k?k:L(ib)),
+        f:r=>'IFERROR('+L(ia)+r+o+(k?k:L(ib)+r)+',"")',
+        v:row=>{const x=num(row[ia]),y=k?kc:num(row[ib]);if(isNaN(x)||isNaN(y))return'';if(o==='/'&&y===0)return'';return o==='+'?x+y:o==='-'?x-y:o==='*'?x*y:x/y}}}},
+  agg(sd,box){
+    const fn=h('select',{'aria-label':'Función'},[['SUM','Suma'],['AVERAGE','Promedio'],['MAX','Máximo'],['MIN','Mínimo'],['COUNT','Cuántos números']].map(([v,t])=>h('option',{value:v},t)));
+    const cb=checks(sd,true);box.append(h('label',{class:'f'},'Función'),fn,h('label',{class:'f'},'Columnas numéricas de cada fila'),cb);
+    return()=>{const cols=picked(cb);if(cols.length<2)throw 'Marca al menos 2 columnas';const F=fn.value;
+      return{desc:F+'('+cols.map(L).join(',')+')',f:r=>'IFERROR('+F+'('+cols.map(j=>L(j)+r).join(',')+'),"")',
+        v:row=>{const n=cols.map(j=>row[j]).filter(v=>typeof v==='number');
+          if(F==='SUM')return n.reduce((s,v)=>s+v,0);if(F==='COUNT')return n.length;if(!n.length)return F==='AVERAGE'?'':0;
+          return F==='AVERAGE'?n.reduce((s,v)=>s+v,0)/n.length:F==='MAX'?Math.max(...n):Math.min(...n)}}}},
+  if(sd,box){
+    const col=selCol(sd,'ic','Columna',false),op=h('select',{'aria-label':'Condición'},[['=','es igual a'],['<>','es distinto de'],['>','es mayor que'],['<','es menor que'],['>=','es mayor o igual a'],['<=','es menor o igual a'],['has','contiene'],['empty','está vacía'],['filled','no está vacía']].map(([v,t])=>h('option',{value:v},t)));
+    const val=h('input',{type:'text',placeholder:'valor a comparar','aria-label':'Valor'}),yes=h('input',{type:'text',placeholder:'si se cumple, escribe…','aria-label':'Si se cumple'}),no=h('input',{type:'text',placeholder:'si no se cumple, escribe…','aria-label':'Si no se cumple'});
+    box.append(h('label',{class:'f'},'Si la columna'),col,op,val,h('label',{class:'f'},'Entonces'),yes,h('label',{class:'f'},'Si no'),no);
+    return()=>{const j=+col.value,o=op.value,t=val.value.trim();const needV=!(o==='empty'||o==='filled');if(needV&&!t)throw 'Escribe el valor a comparar';
+      const A=lit(yes.value.trim()),B=lit(no.value.trim()),ja=jsLit(yes.value.trim()),jb=jsLit(no.value.trim());
+      const cond=r=>{const c=L(j)+r;return o==='has'?'ISNUMBER(SEARCH('+q(t)+','+c+'))':o==='empty'?c+'=""':o==='filled'?c+'<>""':c+o+lit(t)};
+      const test=row=>{const v=row[j],empty=v==null||String(fmt(v)).trim()==='';if(o==='empty')return empty;if(o==='filled')return!empty;
+        if(o==='has')return!empty&&norm(fmt(v)).includes(norm(t));
+        if(isNumStr(t)){const x=typeof v==='number'?v:NaN;if(isNaN(x))return o==='<>';const y=+t;return o==='='?x===y:o==='<>'?x!==y:o==='>'?x>y:o==='<'?x<y:o==='>='?x>=y:x<=y}
+        const x=norm(fmt(v)),y=norm(t);return o==='='?x===y:o==='<>'?x!==y:o==='>'?x>y:o==='<'?x<y:o==='>='?x>=y:x<=y};
+      return{desc:'SI '+L(j)+' '+o+' '+t,f:r=>'IF('+cond(r)+','+A+','+B+')',v:row=>test(row)?ja:jb}}},
+  lookup(sd,box){
+    const B=pickF.sd;if(!B){box.append(h('p',{class:'msg'},'Elige la hoja B arriba.'));return()=>{throw 'Elige la hoja B'}}
+    const ka=selCol(sd,'la','Columna clave en esta hoja',false),kb=selCol(B,'lb','Columna clave en B',false),br=selCol(B,'lc','Columna a traer',false);
+    const gi=B.headers.findIndex(x=>KEYRE.test(x));if(gi>=0)kb.value=gi;const ga=sd.headers.findIndex(x=>KEYRE.test(x));if(ga>=0)ka.value=ga;
+    box.append(h('label',{class:'f'},'Columna clave en esta hoja'),ka,h('label',{class:'f'},'Columna clave en B'),kb,h('label',{class:'f'},'Columna de B que quieres traer'),br);
+    return()=>{const ia=+ka.value,ib=+kb.value,ic=+br.value;let idx=null;
+      const build=()=>{idx=new Map();B.rows.forEach((r,i)=>{const k=typedKey(r[ib]);if(k!=null&&!idx.has(k))idx.set(k,i)})};
+      return{desc:'Buscar '+L(ia)+' en B('+L(ib)+') → '+B.headers[ic],needsB:true,
+        f:(r,bn)=>{const rg=c=>"'"+bn+"'!$"+L(c)+':$'+L(c),ix='INDEX('+rg(ic)+',MATCH('+L(ia)+r+','+rg(ib)+',0))';return'IFERROR(IF('+ix+'="","",'+ix+'),"")'},
+        v:row=>{if(!idx)build();const k=typedKey(row[ia]);const i=k==null?undefined:idx.get(k);if(i==null)return'';const x=B.rows[i][ic];return x==null?'':x}}}},
+  concat(sd,box){
+    const cb=checks(sd,false),sep=h('input',{type:'text',value:' ','aria-label':'Separador'});
+    box.append(h('label',{class:'f'},'Columnas (en orden de la lista)'),cb,h('label',{class:'f'},'Separador'),sep);
+    return()=>{const cols=picked(cb);if(cols.length<2)throw 'Marca al menos 2 columnas';const sp=sep.value;
+      return{desc:cols.map(L).join(' & '),f:r=>cols.map(j=>L(j)+r).join('&'+q(sp)+'&'),v:row=>cols.map(j=>fmt(row[j])).join(sp)}}}
+};
+let getSpec=null;
+function renderBody(){const sd=pickT.sd,box=$('#fBody');box.replaceChildren();getSpec=null;if(!sd)return;
+  const t=$('#fType').value;$('#fLookup').hidden=t!=='lookup';getSpec=FT[t](sd,box)}
+function drawFList(){const box=$('#fList');
+  box.replaceChildren(...fSpecs.map((s,i)=>h('div',{class:'fl'},h('div',null,h('strong',null,s.name),h('br'),h('code',null,s.desc)),h('button',{class:'sm',onclick:()=>{fSpecs.splice(i,1);drawFList()}},'Quitar'))))}
+function setupFormulas(){
+  $('#fType').onchange=renderBody;
+  pickF.onload=()=>{if($('#fType').value==='lookup')renderBody()};
+  $('#fAdd').onclick=()=>{const sd=pickT.sd;if(!sd){toast('Elige una hoja de trabajo');return}
+    const name=$('#fName').value.trim();if(!name){toast('Escribe el nombre de la columna');return}
+    try{const sp=getSpec();sp.name=name;fSpecs.push(sp);drawFList();$('#fName').value='';toast('Columna agregada')}catch(e){toast(typeof e==='string'?e:'Revisa los datos de la fórmula')}};
+  $('#fRun').onclick=runFormulas;
+}
+function buildFormulaWb(sd,totals){
+  const n=sd.rows.length,W=sd.headers.length,mainName=sheetSafe(sd.__n);
+  const ws=XLSX.utils.aoa_to_sheet([[...sd.headers,...fSpecs.map(s=>s.name)],...sd.rows],{cellDates:true});
+  const needB=fSpecs.some(s=>s.needsB),bName=sheetSafe('Datos B',mainName);
+  fSpecs.forEach((s,k)=>{const c=W+k;sd.rows.forEach((row,i)=>{const v=s.v(row);ws[XLSX.utils.encode_cell({r:i+1,c})]={t:typeof v==='number'?'n':'s',v,f:s.f(i+2,bName)}})});
+  const lastR=n+(totals.length?1:0);
+  if(totals.length){totals.forEach(j=>{const sum=sd.rows.reduce((a,r)=>a+(typeof r[j]==='number'?r[j]:0),0);
+      ws[XLSX.utils.encode_cell({r:n+1,c:j})]={t:'n',v:sum,f:'SUM('+L(j)+'2:'+L(j)+(n+1)+')'}});
+    if(!totals.includes(0))ws[XLSX.utils.encode_cell({r:n+1,c:0})]={t:'s',v:'Total'}}
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:lastR,c:W+fSpecs.length-1}});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,mainName);
+  if(needB){const B=pickF.sd;XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([B.headers,...B.rows],{cellDates:true}),bName)}
+  return wb}
+function runFormulas(){
+  const sd=pickT.sd;if(!sd){toast('Elige una hoja de trabajo');return}
+  const totals=picked($('#fTot'));
+  if(!fSpecs.length&&!totals.length){toast('Agrega al menos una columna o una fila de totales');return}
+  const W=sd.headers.length;
+  const headers=[sd.headers[0],...(W>1?[sd.headers[1]]:[]),...fSpecs.map(s=>s.name)];
+  const rows=sd.rows.slice(0,15).map(r=>[r[0],...(W>1?[r[1]]:[]),...fSpecs.map(s=>s.v(r))]);
+  const base=(pickT.file().name||'archivo').replace(/\.(xlsx|xls|csv)$/i,'');
+  $('#fOut').replaceChildren(h('div',{style:'margin-top:12px'},
+    h('div',{class:'stat'},h('span',{class:'pill ok'},fSpecs.length+' columnas con fórmula'),totals.length?h('span',{class:'pill ok'},'Fila de totales'):null),
+    h('p',{class:'msg'},'Vista previa de las primeras 15 filas. Excel recalcula las fórmulas al abrir el archivo.'),
+    tableEl(headers,rows,15),
+    h('div',{class:'row',style:'margin-top:10px'},h('button',{class:'pri',onclick:()=>{
+      try{saveXlsx(null,base+'-formulas.xlsx',()=>buildFormulaWb(sd,totals))}catch(e){toast('No se pudo armar el archivo')}}},'Descargar Excel con fórmulas'))))}
+
 /* ---------- navegación ---------- */
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-go]');if(!b)return;
   document.querySelectorAll('[data-view]').forEach(s=>s.hidden=s.dataset.view!==b.dataset.go);
   document.querySelectorAll('#nav button').forEach(x=>x.removeAttribute('aria-current'));b.setAttribute('aria-current','page');window.scrollTo(0,0)});
 
-setupCross();setupPass();setupReview();setupCommands();notify();
+setupCross();setupPass();setupCreate();setupReview();setupCommands();notify();
 })();
 </script>

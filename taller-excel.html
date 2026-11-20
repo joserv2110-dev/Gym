@@ -107,6 +107,39 @@ nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)
   <div id="crossOut"></div>
 </section>
 
+<section data-view="pasar" hidden>
+  <h2>Pasar datos</h2>
+  <p class="msg">Copia columnas y filas de una hoja a un archivo nuevo, o agrégalas al final de otra hoja.</p>
+  <div class="card"><h3>Origen</h3><div id="pickS"></div>
+    <label class="f">Columnas que quieres pasar</label>
+    <div class="row"><button class="sm" id="colAll">Todas</button><button class="sm" id="colNone">Ninguna</button></div>
+    <div class="checks" id="srcCols" style="margin-top:6px"><span class="msg">Elige una hoja de origen.</span></div>
+    <label class="f" for="fCol">Solo las filas donde…</label>
+    <div class="grid2"><select id="fCol" aria-label="Columna del filtro"></select>
+      <select id="fOp" aria-label="Condición"><option value="has">contiene</option><option value="eq">es igual a</option><option value="ne">es distinto de</option><option value="filled">no está vacío</option><option value="empty">está vacío</option></select></div>
+    <input type="text" id="fVal" placeholder="valor (déjalo vacío para no filtrar)" style="margin-top:8px" aria-label="Valor del filtro">
+    <label class="f" for="dCol">Quitar filas duplicadas según</label><select id="dCol"></select>
+  </div>
+  <div class="card"><h3>Destino</h3>
+    <select id="dest" aria-label="Destino"><option value="new">Archivo nuevo</option><option value="append">Agregar filas al final de otra hoja</option></select>
+    <div id="destBox" hidden><div id="pickD"></div>
+      <p class="msg">Las columnas se unen por nombre. Las que no existan en el destino se agregan al final. Se conservan los valores; el formato original del destino no.</p></div>
+  </div>
+  <button class="pri" id="runPass" style="width:100%">Preparar</button>
+  <div id="passOut"></div>
+
+  <h2 style="margin-top:28px">Unir hojas de un archivo</h2>
+  <p class="msg">Junta varias hojas en una sola tabla y agrega una columna con el nombre de la hoja. Las columnas se unen por nombre.</p>
+  <div class="card">
+    <label class="f" for="uFile">Archivo</label><select id="uFile"></select>
+    <label class="f" for="uQ">Hojas</label><input type="search" id="uQ" placeholder="Filtrar hojas…" aria-label="Filtrar hojas">
+    <div class="row" style="margin:8px 0"><button class="sm" id="uAll">Todas</button><button class="sm" id="uNone">Ninguna</button><span class="msg" id="uCount"></span></div>
+    <div class="checks" id="uSheets"></div>
+    <button class="pri" id="runUnion" style="width:100%;margin-top:10px">Unir hojas</button>
+  </div>
+  <div id="unionOut"></div>
+</section>
+
 <section data-view="revisar" hidden>
   <h2>Revisar datos</h2>
   <p class="msg">Duplicados, celdas vacías y errores (#N/A) de una hoja.</p>
@@ -132,6 +165,7 @@ nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)
 <nav id="nav">
   <button data-go="archivos" aria-current="page">Archivos</button>
   <button data-go="cruzar">Cruzar</button>
+  <button data-go="pasar">Pasar</button>
   <button data-go="revisar">Revisar</button>
   <button data-go="comando">Comandos</button>
 </nav>
@@ -237,10 +271,12 @@ function tableEl(headers,rows,max){max=max||200;
     return h('td',{class:typeof v==='number'?'n':''},fmt(v))}))));
   t.append(tb);const w=h('div',{class:'tw'},t);
   return h('div',null,w,rows.length>max?h('p',{class:'msg'},'Mostrando '+max+' de '+rows.length.toLocaleString('es')+' filas. Descarga el Excel para verlas todas.'):null)}
-async function saveXlsx(sheets,filename){
+async function saveXlsx(sheets,filename,mkWb){
   if(!dl){toast('Descargar no está disponible en esta vista');return}
-  try{const wb=XLSX.utils.book_new();
-    sheets.forEach(s=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([s.headers,...s.rows],{cellDates:true}),s.name.slice(0,31)));
+  try{let wb;
+    if(mkWb)wb=mkWb();
+    else{wb=XLSX.utils.book_new();
+      sheets.forEach(s=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([s.headers,...s.rows],{cellDates:true}),s.name.slice(0,31)))}
     const out=XLSX.write(wb,{type:'array',bookType:'xlsx',cellDates:true});
     await dl.save({filename,data:new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})});toast('Archivo listo')}
   catch(e){if(!e||e.code!=='declined')toast('No se pudo guardar el archivo')}}
@@ -461,11 +497,118 @@ function setupCommands(){
   $('#cmdForm').onsubmit=e=>{e.preventDefault();const v=$('#cmd').value;runCommand(v)}
 }
 
+/* ---------- vista Pasar (etapa 2) ---------- */
+let pickS,pickD;
+function setupPass(){
+  pickS=makePicker($('#pickS'));pickD=makePicker($('#pickD'));
+  const srcCols=$('#srcCols');
+  pickS.onload=sd=>{
+    if(!sd){srcCols.replaceChildren(h('span',{class:'msg'},'Elige una hoja de origen.'));$('#fCol').replaceChildren();$('#dCol').replaceChildren();return}
+    srcCols.replaceChildren(...sd.headers.map((x,i)=>h('label',null,h('input',{type:'checkbox',value:i}),colLetter(i)+' · '+x)));
+    fillCols($('#fCol'),sd.headers);
+    $('#dCol').replaceChildren(h('option',{value:-1},'No quitar duplicados'),...sd.headers.map((x,i)=>h('option',{value:i},colLetter(i)+' · '+x)))};
+  const setAll=on=>srcCols.querySelectorAll('input').forEach(i=>i.checked=on);
+  $('#colAll').onclick=()=>setAll(true);$('#colNone').onclick=()=>setAll(false);
+  $('#dest').onchange=e=>{$('#destBox').hidden=e.target.value!=='append'};
+  $('#runPass').onclick=runPass;
+  setupUnion();
+}
+function passes(op,val){
+  const nv=norm(val),kv=key(val),num=toNum(val);
+  return v=>{const empty=v==null||String(fmt(v)).trim()==='';
+    if(op==='filled')return!empty;if(op==='empty')return empty;
+    if(op==='has')return!empty&&norm(fmt(v)).includes(nv);
+    const eq=!empty&&(key(v)===kv||(!isNaN(num)&&toNum(v)===num));
+    return op==='eq'?eq:!eq}}
+function runPass(){
+  const sd=pickS.sd,out=$('#passOut');if(!sd){toast('Elige la hoja de origen');return}
+  const cols=[...document.querySelectorAll('#srcCols input:checked')].map(i=>+i.value);
+  if(!cols.length){toast('Marca al menos una columna');return}
+  const append=$('#dest').value==='append';
+  if(append&&!pickD.sd){toast('Elige la hoja de destino');return}
+  let rows=sd.rows,notes=[];
+  const op=$('#fOp').value,val=$('#fVal').value.trim();
+  if(val||op==='filled'||op==='empty'){const fj=+$('#fCol').value,pf=passes(op,val);const before=rows.length;
+    rows=rows.filter(r=>pf(r[fj]));notes.push('Filtro: quedan '+rows.length.toLocaleString('es')+' de '+before.toLocaleString('es')+' filas.')}
+  const dj=+$('#dCol').value;
+  if(dj>=0){const seen=new Set();const before=rows.length;
+    rows=rows.filter(r=>{const k=key(r[dj]);if(!k)return true;if(seen.has(k))return false;seen.add(k);return true});
+    if(rows.length<before)notes.push('Se quitaron '+(before-rows.length)+' filas duplicadas.')}
+  const srcH=cols.map(j=>sd.headers[j]);
+  let headers=srcH,data=rows.map(r=>cols.map(j=>r[j])),preview=data,exportFn;
+  if(!append){
+    exportFn=()=>saveXlsx([{name:'Datos',headers:srcH,rows:data}],'datos-pasados.xlsx');
+  }else{
+    const D=pickD.sd,F=pickD.file(),sheetName=D.__n;
+    headers=[...D.headers];const map=srcH.map(x=>{let i=headers.findIndex(y=>norm(y)===norm(x));if(i<0){headers.push(x);i=headers.length-1;notes.push('Columna nueva en el destino: '+x)}return i});
+    const matched=srcH.length-notes.filter(n=>n.startsWith('Columna nueva')).length;
+    notes.unshift(matched+' de '+srcH.length+' columnas coinciden por nombre con el destino.');
+    const W=headers.length;
+    const added=data.map(r=>{const o=new Array(W).fill(null);r.forEach((v,k)=>{o[map[k]]=v});return o});
+    const old=D.rows.map(r=>{const o=r.slice();while(o.length<W)o.push(null);return o});
+    preview=added;
+    const base=F.name.replace(/\.(xlsx|xls|csv)$/i,'');
+    exportFn=()=>saveXlsx(null,base+'-actualizado.xlsx',()=>{
+      const wb=F.isCsv?XLSX.utils.book_new():XLSX.read(F.buf,{type:'array',cellDates:true});
+      const ws=XLSX.utils.aoa_to_sheet([headers,...old,...added],{cellDates:true});
+      if(F.isCsv)XLSX.utils.book_append_sheet(wb,ws,'Datos');else wb.Sheets[sheetName]=ws;
+      return wb});
+  }
+  out.replaceChildren(h('div',{class:'card'},
+    h('div',{class:'stat'},h('span',{class:'pill ok'},data.length.toLocaleString('es')+(append?' filas por agregar':' filas')),h('span',{class:'pill ok'},headers.length+' columnas')),
+    notes.map(n=>h('p',{class:'msg'},n)),
+    h('h3',{style:'margin-top:10px'},append?'Filas que se agregan':'Vista previa'),
+    tableEl(headers,preview,100),
+    h('div',{class:'row',style:'margin-top:10px'},h('button',{class:'pri',onclick:exportFn},'Descargar Excel'))))}
+
+/* Unir hojas */
+const uSel=new Set();
+function setupUnion(){
+  const uf=$('#uFile');
+  const fillU=()=>{const cur=uf.value;uf.replaceChildren(...(S.files.length?S.files.map(f=>h('option',{value:f.id},f.name)):[h('option',{value:''},'Abre un archivo primero')]));
+    if(S.files.some(f=>String(f.id)===cur))uf.value=cur;resetU()};
+  const file=()=>S.files.find(f=>String(f.id)===uf.value);
+  function drawU(){const f=file(),box=$('#uSheets'),q=norm($('#uQ').value);
+    if(!f){box.replaceChildren();$('#uCount').textContent='';return}
+    box.replaceChildren(...f.sheetNames.filter(n=>!q||norm(n).includes(q)).map(n=>{
+      const cb=h('input',{type:'checkbox'});cb.checked=uSel.has(n);cb.onchange=()=>{cb.checked?uSel.add(n):uSel.delete(n);cnt()};
+      return h('label',null,cb,n)}));cnt()}
+  function cnt(){const f=file();$('#uCount').textContent=f?uSel.size+' de '+f.sheetNames.length+' hojas':''}
+  function resetU(){const f=file();uSel.clear();if(f)f.sheetNames.forEach(n=>uSel.add(n));drawU()}
+  uf.onchange=resetU;$('#uQ').oninput=drawU;
+  const vis=on=>{const f=file();if(!f)return;const q=norm($('#uQ').value);f.sheetNames.filter(n=>!q||norm(n).includes(q)).forEach(n=>on?uSel.add(n):uSel.delete(n));drawU()};
+  $('#uAll').onclick=()=>vis(true);$('#uNone').onclick=()=>vis(false);
+  S.listeners.push(fillU);fillU();
+  $('#runUnion').onclick=async()=>{
+    const f=file(),out=$('#unionOut');if(!f){toast('Abre un archivo primero');return}
+    const names=f.sheetNames.filter(n=>uSel.has(n));if(!names.length){toast('Marca al menos una hoja');return}
+    const st=h('div',{class:'spin'},'Uniendo…');out.replaceChildren(st);
+    const hmap=new Map(),hdrs=[],rows=[];let used=0,empty=0,extra=0,first=null;
+    for(let i=0;i<names.length;i++){const n=names[i];st.textContent='Uniendo hoja '+(i+1)+' de '+names.length+'…';
+      const had=!!f.parsed[n];let sd;
+      try{sd=await getSheet(f,n)}catch(e){continue}
+      if(!sd.headers.length||!sd.rows.length){empty++;if(!had)delete f.parsed[n];continue}
+      const before=hdrs.length;
+      const idx=sd.headers.map(x=>{const k=norm(x);let u=hmap.get(k);if(u==null){u=hdrs.length;hmap.set(k,u);hdrs.push(x)}return u});
+      if(first!==null&&hdrs.length>before)extra++;if(first===null)first=true;
+      for(const r of sd.rows){const o=[n];for(let j=0;j<idx.length;j++)o[idx[j]+1]=r[j];rows.push(o)}
+      used++;if(!had)delete f.parsed[n]}
+    const W=hdrs.length+1;for(const o of rows)for(let j=0;j<W;j++)if(o[j]===undefined)o[j]=null;
+    const headers=['Hoja',...hdrs];
+    if(!rows.length){out.replaceChildren(h('div',{class:'card'},h('p',null,'Las hojas elegidas no tienen datos.')));return}
+    out.replaceChildren(h('div',{class:'card'},
+      h('div',{class:'stat'},h('span',{class:'pill ok'},used+' hojas unidas'),h('span',{class:'pill ok'},rows.length.toLocaleString('es')+' filas'),h('span',{class:'pill ok'},headers.length+' columnas'),
+        empty?h('span',{class:'pill wn'},empty+' hojas vacías omitidas'):null,extra?h('span',{class:'pill wn'},extra+' hojas con columnas distintas'):null),
+      rows.length>1048575?h('p',{class:'msg'},'Excel admite 1,048,575 filas por hoja; el resultado es mayor y se recortará.'):null,
+      tableEl(headers,rows,100),
+      h('div',{class:'row',style:'margin-top:10px'},h('button',{class:'pri',onclick:()=>saveXlsx([{name:'Unido',headers,rows:rows.slice(0,1048575)}],'hojas-unidas.xlsx')},'Descargar Excel'))))}
+}
+
 /* ---------- navegación ---------- */
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-go]');if(!b)return;
   document.querySelectorAll('[data-view]').forEach(s=>s.hidden=s.dataset.view!==b.dataset.go);
   document.querySelectorAll('#nav button').forEach(x=>x.removeAttribute('aria-current'));b.setAttribute('aria-current','page');window.scrollTo(0,0)});
 
-setupCross();setupReview();setupCommands();notify();
+setupCross();setupPass();setupReview();setupCommands();notify();
 })();
 </script>

@@ -1,0 +1,471 @@
+<title>Taller Excel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Concepto: herramienta de bolsillo, una columna, navegación inferior al alcance del pulgar */
+:root{
+  --bg:#f2f5f3; --surface:#ffffff; --surface2:#e9eeea; --fg:#14201a; --muted:#5a6a62; --line:#d3dbd6;
+  --accent:#1a7f4b; --accent-fg:#ffffff; --accent-soft:#dcf0e5;
+  --warn:#a8530a; --warn-soft:#fbead6; --bad:#b42318; --bad-soft:#fbe1de;
+  --c1:#1a7f4b; --c2:#2f6fba; --c3:#c2410c; --c4:#8a6d1f; --c5:#0e7c86; --c6:#a33a6b;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1511; --surface:#17211b; --surface2:#1f2b24; --fg:#e7f0ea; --muted:#9aaba1; --line:#2b382f;
+  --accent:#3ccf86; --accent-fg:#04210f; --accent-soft:#163524;
+  --warn:#f0a35a; --warn-soft:#3a2713; --bad:#ff8a7d; --bad-soft:#3b1b18;
+  --c1:#3ccf86; --c2:#6fa8f0; --c3:#f08a5a; --c4:#d9b84f; --c5:#4fc4cf; --c6:#e27aa8; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1511; --surface:#17211b; --surface2:#1f2b24; --fg:#e7f0ea; --muted:#9aaba1; --line:#2b382f;
+  --accent:#3ccf86; --accent-fg:#04210f; --accent-soft:#163524;
+  --warn:#f0a35a; --warn-soft:#3a2713; --bad:#ff8a7d; --bad-soft:#3b1b18;
+  --c1:#3ccf86; --c2:#6fa8f0; --c3:#f08a5a; --c4:#d9b84f; --c5:#4fc4cf; --c6:#e27aa8; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 84px}
+.wrap{max-width:760px;margin:0 auto}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:12px 0 10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:12.5px}
+h2{font-size:16px;margin:20px 0 8px;font-weight:650}
+h3{font-size:13px;margin:0 0 6px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+p{margin:6px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin:8px 0 3px;font-weight:500}
+select,input[type=text],input[type=search]{width:100%;min-height:44px;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button,.btn{font:inherit;min-height:44px;padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button.pri,.btn.pri{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button.sm{min-height:36px;padding:4px 12px;font-size:13px}
+button:disabled{opacity:.5}
+.chip{min-height:36px;padding:4px 12px;font-size:13px;font-weight:500;border-radius:18px;text-align:left}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tw{overflow:auto;max-height:55vh;border:1px solid var(--line);border-radius:8px;background:var(--surface);-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;width:max-content;min-width:100%}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--surface2);font-weight:600;z-index:1}
+td.n{text-align:right}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11.5px;font-weight:600}
+.ok{background:var(--accent-soft);color:var(--accent)} .wn{background:var(--warn-soft);color:var(--warn)} .bd{background:var(--bad-soft);color:var(--bad)}
+.stat{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.stat span{font-size:13px}
+.file{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin:10px 0;overflow:hidden}
+.file>.hd{padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.file .nm{font-weight:600;overflow-wrap:anywhere}
+.sheets{border-top:1px solid var(--line);max-height:260px;overflow:auto}
+.sheets button{width:100%;justify-content:space-between;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;font-weight:500;text-align:left}
+.sheets button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
+.drop{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:22px 14px;border:1.5px dashed var(--line);border-radius:12px;background:var(--surface)}
+.drop input{display:none}
+.msg{color:var(--muted);font-size:13px}
+.res{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0}
+.res .q{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-bottom:8px;overflow-wrap:anywhere}
+.chartbox{position:relative;height:290px}
+.checks{max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--surface)}
+.checks label{display:flex;gap:10px;align-items:center;min-height:36px}
+.checks input{width:18px;height:18px;accent-color:var(--accent)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);z-index:6}
+nav button{flex:1;border:0;border-radius:0;background:transparent;min-height:56px;flex-direction:column;gap:0;font-size:12.5px;color:var(--muted);border-top:3px solid transparent}
+nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13.5px;z-index:20;max-width:90vw}
+.spin{color:var(--muted);font-size:13px;padding:8px 0}
+</style>
+
+<div class="wrap">
+<header><h1>Taller Excel</h1><span class="sub" id="hdrinfo">Sin archivos</span></header>
+
+<section data-view="archivos">
+  <h2>Archivos</h2>
+  <label class="drop" for="fin">
+    <strong>Abrir archivos de Excel</strong>
+    <span class="msg">.xlsx, .xls o .csv. Desde Archivos, iCloud o Drive. Los datos se procesan en tu iPhone.</span>
+    <span class="btn pri">Elegir archivos</span>
+    <input id="fin" type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv">
+  </label>
+  <p class="msg">Los archivos de WhatsApp primero se guardan en Archivos (Compartir → Guardar en Archivos).</p>
+  <div id="files"></div>
+  <div id="preview"></div>
+</section>
+
+<section data-view="cruzar" hidden>
+  <h2>Cruzar dos archivos</h2>
+  <p class="msg">Busca los datos de una hoja (A) dentro de otra (B), por ejemplo por número de parte, y trae columnas de B.</p>
+  <div class="card"><h3>Hoja A (la que revisas)</h3><div id="pickA"></div>
+    <label class="f" for="keyA">Columna clave en A</label><select id="keyA"></select></div>
+  <div class="card"><h3>Hoja B (donde buscas)</h3><div id="pickB"></div>
+    <label class="f" for="keyB">Columna clave en B</label><select id="keyB"></select>
+    <label class="f">Columnas de B que quieres traer</label><div class="checks" id="bring"><span class="msg">Elige una hoja B.</span></div>
+    <label class="checks" style="border:0;padding:0;margin-top:6px"><span style="display:flex;gap:10px;align-items:center;min-height:36px"><input type="checkbox" id="allA"> Incluir todas las columnas de A en el resultado</span></label>
+  </div>
+  <button class="pri" id="runCross" style="width:100%">Cruzar</button>
+  <div id="crossOut"></div>
+</section>
+
+<section data-view="revisar" hidden>
+  <h2>Revisar datos</h2>
+  <p class="msg">Duplicados, celdas vacías y errores (#N/A) de una hoja.</p>
+  <div class="card"><div id="pickR"></div>
+    <label class="f" for="keyR">Columna clave para duplicados</label><select id="keyR"></select></div>
+  <button class="pri" id="runRev" style="width:100%">Revisar</button>
+  <div id="revOut"></div>
+</section>
+
+<section data-view="comando" hidden>
+  <h2>Comandos</h2>
+  <p class="msg">Escribe lo que quieres en español. Ejemplo: <em>gráfica de barras de Motor y Volume 2027</em>.</p>
+  <div class="card"><div id="pickC"></div></div>
+  <form id="cmdForm" class="row" style="flex-wrap:nowrap">
+    <input type="text" id="cmd" placeholder="Escribe un comando…" enterkeyhint="go" autocomplete="off" autocapitalize="none" aria-label="Comando">
+    <button class="pri" type="submit">Enviar</button>
+  </form>
+  <div class="chips" id="examples"></div>
+  <div id="results"></div>
+</section>
+</div>
+
+<nav id="nav">
+  <button data-go="archivos" aria-current="page">Archivos</button>
+  <button data-go="cruzar">Cruzar</button>
+  <button data-go="revisar">Revisar</button>
+  <button data-go="comando">Comandos</button>
+</nav>
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const S={files:[],listeners:[]};let uid=0;
+let dl=null;
+try{ if(window.claude&&claude.use) claude.use('downloads').then(d=>{dl=d}).catch(()=>{}); }catch(e){}
+
+/* ---------- utilidades ---------- */
+function h(tag,attrs,...kids){const e=document.createElement(tag);
+  if(attrs)for(const k in attrs){if(k==='class')e.className=attrs[k];else if(k.startsWith('on'))e.addEventListener(k.slice(2),attrs[k]);else if(attrs[k]!==false&&attrs[k]!=null)e.setAttribute(k,attrs[k]===true?'':attrs[k])}
+  kids.flat().forEach(c=>{if(c==null||c===false)return;e.append(c.nodeType?c:document.createTextNode(String(c)))});return e}
+const tick=()=>new Promise(r=>setTimeout(r,30));
+const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const key=v=>v==null?'':(v instanceof Date?v.toISOString():String(v).trim().toUpperCase());
+const fmt=v=>v==null?'':(v instanceof Date?v.toISOString().slice(0,10):(typeof v==='number'?String(Math.round(v*1e6)/1e6):String(v)));
+const toNum=v=>{if(typeof v==='number')return v;if(v==null)return NaN;const t=String(v).trim();return /^-?\d[\d,]*\.?\d*$/.test(t)?parseFloat(t.replace(/,/g,'')):NaN};
+function colLetter(n){let s='';n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3200)}
+function mb(n){return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
+const ERR=/^#(N\/A|REF!|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!)$/i;
+
+/* ---------- lectura de archivos ---------- */
+async function addFiles(list){
+  for(const file of list){
+    const box=$('#files');const st=h('div',{class:'spin'},'Leyendo '+file.name+'…');box.append(st);await tick();
+    try{
+      const buf=await file.arrayBuffer();
+      const isCsv=/\.csv$/i.test(file.name);
+      let sheetNames,wb=null;
+      if(isCsv){wb=XLSX.read(buf,{type:'array',cellDates:true,raw:true});sheetNames=wb.SheetNames}
+      else{sheetNames=XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames}
+      S.files.push({id:++uid,name:file.name,size:file.size,buf:isCsv?null:buf,wb,isCsv,sheetNames,parsed:{}});
+    }catch(e){toast('No pude abrir '+file.name)}
+    st.remove();
+  }
+  notify();
+}
+async function getSheet(f,name){
+  if(f.parsed[name])return f.parsed[name];
+  await tick();
+  const wb=f.isCsv?f.wb:XLSX.read(f.buf,{type:'array',sheets:name,cellDates:true});
+  const ws=wb.Sheets[name];
+  const raw=ws?XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:false}):[];
+  const hi=raw.findIndex(r=>r.some(v=>v!=null&&String(v).trim()!==''));
+  if(hi<0)return(f.parsed[name]={headers:[],rows:[],errs:[]});
+  let ncol=0;for(let i=hi;i<raw.length;i++)if(raw[i].length>ncol)ncol=raw[i].length;
+  const seen={},hr=raw[hi];
+  const headers=Array.from({length:ncol},(_,j)=>{let t=hr[j];t=(t==null||String(t).trim()==='')?'Col '+colLetter(j):String(t).trim();
+    if(seen[t]){seen[t]++;return t+' ('+seen[t]+')'}seen[t]=1;return t});
+  const errs=new Array(ncol).fill(0);
+  const rows=new Array(raw.length-hi-1);
+  for(let i=hi+1;i<raw.length;i++){const r=raw[i],o=new Array(ncol);
+    for(let j=0;j<ncol;j++){let v=r[j];
+      if(typeof v==='string'){const t=v.trim();if(ERR.test(t)){errs[j]++;v=null}else v=t===''?null:t}
+      else if(v===undefined)v=null;
+      o[j]=v}
+    rows[i-hi-1]=o}
+  return(f.parsed[name]={headers,rows,errs});
+}
+function isNumCol(sd,j){let n=0,t=0;for(const r of sd.rows){const v=r[j];if(v==null)continue;t++;if(!isNaN(toNum(v)))n++;if(t>=400)break}return t>0&&n/t>=.6}
+function notify(){S.listeners.forEach(f=>f())}
+S.listeners.push(()=>{$('#hdrinfo').textContent=S.files.length?S.files.length+(S.files.length===1?' archivo':' archivos'):'Sin archivos'});
+
+/* ---------- selector de archivo y hoja ---------- */
+function makePicker(host){
+  const fs=h('select',{'aria-label':'Archivo'}),ss=h('select',{'aria-label':'Hoja'}),st=h('div',{class:'msg'});
+  host.append(h('label',{class:'f'},'Archivo'),fs,h('label',{class:'f'},'Hoja'),ss,st);
+  const P={sd:null,onload:null,tok:0};
+  P.file=()=>S.files.find(f=>String(f.id)===fs.value);
+  function fillFiles(){const cur=fs.value;fs.replaceChildren(...(S.files.length?S.files.map(f=>h('option',{value:f.id},f.name)):[h('option',{value:''},'Abre un archivo primero')]));
+    if(S.files.some(f=>String(f.id)===cur))fs.value=cur;fillSheets(true)}
+  function fillSheets(keep){const f=P.file();const cur=ss.value;ss.replaceChildren(...(f?f.sheetNames.map(n=>h('option',{value:n},n)):[]));
+    if(keep&&f&&f.sheetNames.includes(cur))ss.value=cur;load(!keep||!P.sd)}
+  async function load(force){const f=P.file(),n=ss.value;const t=++P.tok;
+    if(!f||!n){P.sd=null;st.textContent='';P.onload&&P.onload(null);return}
+    if(P.sd&&!force&&P.sd.__f===f.id&&P.sd.__n===n)return;
+    st.textContent='Leyendo hoja…';
+    const sd=await getSheet(f,n);if(t!==P.tok)return;
+    sd.__f=f.id;sd.__n=n;P.sd=sd;
+    st.textContent=sd.rows.length.toLocaleString('es')+' filas · '+sd.headers.length+' columnas';
+    P.onload&&P.onload(sd)}
+  fs.onchange=()=>fillSheets(false);ss.onchange=()=>load(true);
+  P.set=(fid,sheet)=>{fs.value=fid;fillSheets(false);ss.value=sheet;load(true)};
+  S.listeners.push(fillFiles);fillFiles();
+  return P}
+function fillCols(sel,headers,pref){sel.replaceChildren(...headers.map((x,i)=>h('option',{value:i},colLetter(i)+' · '+x)));
+  if(pref){const i=headers.findIndex(x=>pref.test(x));if(i>=0)sel.value=i}}
+const KEYRE=/part|parte|product|sku|^id$|numero|número|n[uú]m/i;
+
+/* ---------- tabla ---------- */
+function tableEl(headers,rows,max){max=max||200;
+  const t=h('table');t.append(h('thead',null,h('tr',null,headers.map(x=>h('th',null,x)))));
+  const tb=h('tbody');rows.slice(0,max).forEach(r=>tb.append(h('tr',null,headers.map((_,j)=>{const v=r[j];
+    if(v&&v.__pill)return h('td',null,h('span',{class:'pill '+v.c},v.t));
+    return h('td',{class:typeof v==='number'?'n':''},fmt(v))}))));
+  t.append(tb);const w=h('div',{class:'tw'},t);
+  return h('div',null,w,rows.length>max?h('p',{class:'msg'},'Mostrando '+max+' de '+rows.length.toLocaleString('es')+' filas. Descarga el Excel para verlas todas.'):null)}
+async function saveXlsx(sheets,filename){
+  if(!dl){toast('Descargar no está disponible en esta vista');return}
+  try{const wb=XLSX.utils.book_new();
+    sheets.forEach(s=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([s.headers,...s.rows],{cellDates:true}),s.name.slice(0,31)));
+    const out=XLSX.write(wb,{type:'array',bookType:'xlsx',cellDates:true});
+    await dl.save({filename,data:new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})});toast('Archivo listo')}
+  catch(e){if(!e||e.code!=='declined')toast('No se pudo guardar el archivo')}}
+const plain=r=>r.map(v=>v&&v.__pill?v.t:v);
+
+/* ---------- vista Archivos ---------- */
+let pickA,pickB,pickR,pickC;
+function renderFiles(){
+  const box=$('#files');box.replaceChildren();
+  S.files.forEach(f=>{
+    const list=h('div',{class:'sheets'});
+    const search=f.sheetNames.length>12?h('input',{type:'search',placeholder:'Filtrar '+f.sheetNames.length+' hojas…','aria-label':'Filtrar hojas',style:'margin:8px;width:calc(100% - 16px)'}):null;
+    const draw=q=>{list.replaceChildren(...f.sheetNames.filter(n=>!q||norm(n).includes(norm(q))).map(n=>
+      h('button',{'aria-pressed':String(S.sel&&S.sel.f===f.id&&S.sel.n===n),onclick:()=>openSheet(f,n)},h('span',null,n),h('span',{class:'msg'},f.parsed[n]?f.parsed[n].rows.length.toLocaleString('es')+' filas':'Ver'))))};
+    draw('');if(search)search.oninput=()=>draw(search.value);
+    box.append(h('div',{class:'file'},
+      h('div',{class:'hd'},h('div',null,h('div',{class:'nm'},f.name),h('div',{class:'msg'},mb(f.size)+' · '+f.sheetNames.length+(f.sheetNames.length===1?' hoja':' hojas'))),
+        h('button',{class:'sm',onclick:()=>{S.files=S.files.filter(x=>x.id!==f.id);if(S.sel&&S.sel.f===f.id){S.sel=null;$('#preview').replaceChildren()}notify()}},'Quitar')),
+      search,list));
+  })}
+async function openSheet(f,n){
+  S.sel={f:f.id,n};renderFiles();
+  const pv=$('#preview');pv.replaceChildren(h('div',{class:'spin'},'Leyendo '+n+'…'));
+  const sd=await getSheet(f,n);renderFiles();
+  pv.replaceChildren(h('div',{class:'card'},
+    h('h3',null,'Vista previa · '+n),
+    h('p',{class:'msg'},sd.rows.length.toLocaleString('es')+' filas · '+sd.headers.length+' columnas'),
+    h('div',{class:'row',style:'margin:8px 0'},
+      h('button',{class:'sm',onclick:()=>{pickR.set(f.id,n);pickC.set(f.id,n);toast('Hoja activa: '+n)}},'Usar en Revisar y Comandos'),
+      h('button',{class:'sm',onclick:()=>{pickA.set(f.id,n);toast('Cruce A: '+n)}},'Cruce: A'),
+      h('button',{class:'sm',onclick:()=>{pickB.set(f.id,n);toast('Cruce B: '+n)}},'Cruce: B')),
+    tableEl(sd.headers,sd.rows.slice(0,30),30)));
+  pv.scrollIntoView({behavior:'smooth',block:'nearest'})}
+S.listeners.push(renderFiles);
+$('#fin').addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value=''});
+
+/* ---------- vista Cruzar ---------- */
+function setupCross(){
+  pickA=makePicker($('#pickA'));pickB=makePicker($('#pickB'));
+  pickA.onload=sd=>{if(sd)fillCols($('#keyA'),sd.headers,KEYRE);else $('#keyA').replaceChildren()};
+  pickB.onload=sd=>{const b=$('#bring');
+    if(!sd){b.replaceChildren(h('span',{class:'msg'},'Elige una hoja B.'));$('#keyB').replaceChildren();return}
+    fillCols($('#keyB'),sd.headers,KEYRE);
+    b.replaceChildren(...sd.headers.map((x,i)=>h('label',null,h('input',{type:'checkbox',value:i}),x)))};
+  $('#runCross').onclick=runCross;
+}
+let crossRes=null;
+async function runCross(){
+  const A=pickA.sd,B=pickB.sd;const out=$('#crossOut');
+  if(!A||!B){toast('Elige la hoja A y la hoja B');return}
+  const ka=+$('#keyA').value,kb=+$('#keyB').value;
+  const bring=[...document.querySelectorAll('#bring input:checked')].map(i=>+i.value);
+  const all=$('#allA').checked;
+  const idx=new Map();B.rows.forEach((r,i)=>{const k=key(r[kb]);if(!k)return;const e=idx.get(k);if(e)e.push(i);else idx.set(k,[i])});
+  const seen=new Set();
+  const cols=all?A.headers.map((_,j)=>j):[ka];
+  const headers=[...cols.map(j=>A.headers[j]),...bring.map(j=>'B: '+B.headers[j]),'Estado'];
+  let found=0,miss=0,rep=0,nokey=0;
+  const rows=A.rows.map(r=>{const k=key(r[ka]);if(k)seen.add(k);const m=k?idx.get(k):null;
+    let est;if(!k){est={__pill:1,c:'wn',t:'Sin clave'};nokey++}
+    else if(!m){est={__pill:1,c:'bd',t:'No está en B'};miss++}
+    else if(m.length>1){est={__pill:1,c:'wn',t:'Repetido en B ('+m.length+')'};rep++;found++}
+    else{est={__pill:1,c:'ok',t:'Encontrado'};found++}
+    const br=bring.map(j=>m?B.rows[m[0]][j]:null);
+    return[...cols.map(j=>r[j]),...br,est]});
+  const onlyB=B.rows.filter(r=>{const k=key(r[kb]);return k&&!seen.has(k)});
+  crossRes={headers,rows,B,onlyB};
+  const show=f=>{
+    const sel=f==='ok'?rows.filter(r=>r[r.length-1].c==='ok'||(r[r.length-1].t||'').startsWith('Repetido')):f==='no'?rows.filter(r=>r[r.length-1].c==='bd'):rows;
+    tbl.replaceChildren(tableEl(headers,sel))};
+  const tbl=h('div');
+  const mk=(t,f)=>h('button',{class:'chip',onclick:()=>show(f)},t);
+  out.replaceChildren(h('div',{class:'card'},
+    h('div',{class:'stat'},h('span',{class:'pill ok'},found.toLocaleString('es')+' encontrados'),h('span',{class:'pill bd'},miss.toLocaleString('es')+' no están en B'),
+      rep?h('span',{class:'pill wn'},rep+' repetidos en B'):null,nokey?h('span',{class:'pill wn'},nokey+' sin clave'):null,
+      h('span',{class:'pill wn'},onlyB.length.toLocaleString('es')+' solo en B')),
+    h('div',{class:'chips'},mk('Todos','all'),mk('Encontrados','ok'),mk('No encontrados','no')),
+    tbl,
+    h('div',{class:'row',style:'margin-top:10px'},h('button',{class:'pri',onclick:()=>saveXlsx([
+      {name:'Cruce',headers,rows:rows.map(plain)},
+      {name:'Solo en B',headers:B.headers,rows:onlyB}],'cruce.xlsx')},'Descargar Excel'))));
+  show('all');
+}
+
+/* ---------- vista Revisar ---------- */
+function setupReview(){
+  pickR=makePicker($('#pickR'));
+  pickR.onload=sd=>{if(sd)fillCols($('#keyR'),sd.headers,KEYRE);else $('#keyR').replaceChildren()};
+  $('#runRev').onclick=()=>{const sd=pickR.sd;if(!sd){toast('Elige una hoja');return}
+    const out=$('#revOut');const k=+$('#keyR').value;
+    const groups=new Map();sd.rows.forEach((r,i)=>{const v=key(r[k]);if(!v)return;const g=groups.get(v);if(g)g.push(i+2);else groups.set(v,[i+2])});
+    const dups=[...groups.entries()].filter(([,g])=>g.length>1).sort((a,b)=>b[1].length-a[1].length);
+    const dupRows=dups.reduce((s,[,g])=>s+g.length,0);
+    const colStats=sd.headers.map((x,j)=>{let e=0;for(const r of sd.rows)if(r[j]==null)e++;return[x,e,sd.errs[j]]}).filter(c=>c[1]||c[2]).sort((a,b)=>(b[1]+b[2])-(a[1]+a[2]));
+    out.replaceChildren(h('div',{class:'card'},
+      h('div',{class:'stat'},h('span',{class:'pill ok'},sd.rows.length.toLocaleString('es')+' filas'),
+        h('span',{class:'pill '+(dups.length?'wn':'ok')},dups.length+' claves duplicadas ('+dupRows+' filas)'),
+        h('span',{class:'pill '+(colStats.length?'wn':'ok')},colStats.length+' columnas con vacíos o errores')),
+      h('h3',{style:'margin-top:14px'},'Duplicados en '+sd.headers[k]),
+      dups.length?tableEl(['Clave','Veces','Filas (Excel)'],dups.map(([v,g])=>[v,g.length,g.slice(0,12).join(', ')+(g.length>12?'…':'')]),150):h('p',{class:'msg'},'No hay claves repetidas.'),
+      h('h3',{style:'margin-top:14px'},'Vacíos y errores por columna'),
+      colStats.length?tableEl(['Columna','Celdas vacías','Errores (#N/A…)'],colStats,150):h('p',{class:'msg'},'Sin vacíos ni errores.'),
+      h('div',{class:'row',style:'margin-top:10px'},h('button',{class:'pri',onclick:()=>saveXlsx([
+        {name:'Duplicados',headers:['Clave','Veces','Filas'],rows:dups.map(([v,g])=>[v,g.length,g.join(', ')])},
+        {name:'Vacios y errores',headers:['Columna','Vacías','Errores'],rows:colStats}],'revision.xlsx')},'Descargar Excel'))))}
+}
+
+/* ---------- vista Comandos ---------- */
+const charts=[];
+function findCols(cmd,headers){
+  const n=' '+norm(cmd).replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ')+' ';
+  let hits=[];
+  headers.forEach((hd,i)=>{const hn=norm(hd).replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ').trim();if(!hn)return;
+    const idx=n.indexOf(' '+hn+' ');if(idx>=0)hits.push({i,s:idx,e:idx+hn.length+1})});
+  hits=hits.filter(a=>!hits.some(b=>b!==a&&b.s<=a.s&&b.e>=a.e&&(b.e-b.s)>(a.e-a.s)));
+  return hits.sort((a,b)=>a.s-b.s).map(x=>x.i)}
+function aggregate(sd,xj,yj,mode,asc){
+  const m=new Map();
+  for(const r of sd.rows){const lab=r[xj]==null?'(vacío)':fmt(r[xj]);let e=m.get(lab);if(!e){e={s:0,c:0,n:0};m.set(lab,e)}
+    e.c++;if(yj!=null){const v=toNum(r[yj]);if(!isNaN(v)){e.s+=v;e.n++}}}
+  let arr=[...m.entries()].map(([k,e])=>[k,mode==='count'||yj==null?e.c:mode==='avg'?(e.n?e.s/e.n:0):e.s]);
+  return arr}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function drawChart(canvas,type,labels,values,title){
+  const pal=[1,2,3,4,5,6].map(i=>cssv('--c'+i));
+  const bgp={id:'bgp',beforeDraw(c){const x=c.ctx;x.save();x.globalCompositeOperation='destination-over';x.fillStyle=cssv('--surface');x.fillRect(0,0,c.width,c.height);x.restore()}};
+  const pie=type==='pie';
+  const ch=new Chart(canvas,{type:pie?'doughnut':type,data:{labels,datasets:[{label:title,data:values,
+      backgroundColor:pie?labels.map((_,i)=>pal[i%6]):pal[0],borderColor:pie?cssv('--surface'):pal[0],borderWidth:pie?2:2,pointRadius:type==='line'?2:0,tension:.2}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:pie,position:'bottom',labels:{color:cssv('--muted'),boxWidth:12,font:{size:11}}},title:{display:true,text:title,color:cssv('--fg'),font:{size:13,weight:'600'}}},
+      scales:pie?{}:{x:{ticks:{color:cssv('--muted'),maxRotation:60,autoSkip:true,font:{size:10}},grid:{color:cssv('--line')}},y:{beginAtZero:true,ticks:{color:cssv('--muted'),font:{size:10}},grid:{color:cssv('--line')}}}},
+    plugins:[bgp]});
+  charts.push(ch);while(charts.length>6){charts.shift().destroy()}
+  return ch}
+function resCard(q,...kids){const c=h('article',{class:'res'},h('div',{class:'q'},'› '+q),...kids);const r=$('#results');r.prepend(c);while(r.children.length>8)r.lastChild.remove();return c}
+
+async function runCommand(text){
+  const sd=pickC.sd;const q=text.trim();if(!q)return;
+  if(!sd){resCard(q,h('p',null,'Primero abre un archivo y elige una hoja arriba.'));return}
+  const n=norm(q);const cols=findCols(q,sd.headers);
+  const colList=()=>h('div',{class:'chips'},sd.headers.slice(0,40).map(x=>h('button',{class:'chip',onclick:()=>{$('#cmd').value=($('#cmd').value+' '+x).trim();$('#cmd').focus()}},x)));
+  // gráficas
+  if(/grafic|chart|barras|pastel|circular|lineas|linea/.test(n)){
+    if(!cols.length){resCard(q,h('p',null,'No reconocí ninguna columna. Usa el nombre tal como aparece en la hoja. Toca una para agregarla:'),colList());return}
+    let xj=cols[0],yj=cols[1]!=null?cols[1]:null;
+    if(yj!=null&&isNumCol(sd,xj)&&!isNumCol(sd,yj)){[xj,yj]=[yj,xj]}
+    const type=/pastel|circular|pie/.test(n)?'pie':/linea/.test(n)?'line':'bar';
+    let mode=/promedio|media/.test(n)?'avg':/cuent|conteo|cuantos/.test(n)?'count':'sum';
+    if(yj!=null&&!isNumCol(sd,yj)){mode='count';yj=null}
+    if(yj==null)mode='count';
+    let data=aggregate(sd,xj,yj,mode);
+    const numX=isNumCol(sd,xj);
+    if(type==='line')data.sort((a,b)=>numX?toNum(a[0])-toNum(b[0]):String(a[0]).localeCompare(String(b[0]),'es',{numeric:true}));
+    else data.sort((a,b)=>b[1]-a[1]);
+    const total=data.length,lim=type==='line'?80:15;
+    if(total>lim){if(type==='pie'){const rest=data.slice(lim).reduce((s,d)=>s+d[1],0);data=[...data.slice(0,lim),['Otros',rest]]}else data=data.slice(0,lim)}
+    const verb={sum:'Suma de ',avg:'Promedio de ',count:'Conteo por '}[mode];
+    const title=mode==='count'?'Conteo por '+sd.headers[xj]:verb+sd.headers[yj]+' por '+sd.headers[xj];
+    const canvas=h('canvas');const box=h('div',{class:'chartbox'},canvas);
+    const card=resCard(q,box,total>lim?h('p',{class:'msg'},'Mostrando '+lim+' de '+total+' categorías.'):null,
+      h('div',{class:'row',style:'margin-top:8px'},
+        h('button',{class:'sm',onclick:()=>{if(!dl){toast('Descargar no está disponible aquí');return}canvas.toBlob(b=>dl.save({filename:'grafica.png',data:b}).catch(e=>{if(!e||e.code!=='declined')toast('No se pudo guardar')}))}},'Guardar imagen'),
+        h('button',{class:'sm',onclick:()=>saveXlsx([{name:'Datos',headers:[sd.headers[xj],mode==='count'?'Conteo':sd.headers[yj]],rows:data}],'datos-grafica.xlsx')},'Datos en Excel')));
+    drawChart(canvas,type,data.map(d=>d[0]),data.map(d=>Math.round(d[1]*100)/100),title);return}
+  // duplicados
+  if(/duplicad|repetid/.test(n)){
+    const k=cols.length?cols[0]:0;const g=new Map();
+    sd.rows.forEach((r,i)=>{const v=key(r[k]);if(!v)return;(g.get(v)||g.set(v,[]).get(v)).push(i+2)});
+    const d=[...g.entries()].filter(([,a])=>a.length>1).sort((a,b)=>b[1].length-a[1].length);
+    resCard(q,h('p',null,d.length+' valores repetidos en '+sd.headers[k]+'.'),d.length?tableEl(['Valor','Veces','Filas (Excel)'],d.map(([v,a])=>[v,a.length,a.join(', ')]),150):null);return}
+  // vacíos
+  if(/vacio|faltante|sin dato|error|n\/a|na\b/.test(n)&&!/grafic/.test(n)){
+    const t=sd.headers.map((x,j)=>{let e=0;for(const r of sd.rows)if(r[j]==null)e++;return[x,e,sd.errs[j]]}).filter(c=>c[1]||c[2]).sort((a,b)=>(b[1]+b[2])-(a[1]+a[2]));
+    resCard(q,t.length?tableEl(['Columna','Vacías','Errores (#N/A…)'],t,150):h('p',null,'No hay vacíos ni errores.'));return}
+  // resumen por columna
+  if(/cuent|conteo|resumen|agrupa|suma|promedio|total|cuantos/.test(n)&&cols.length){
+    let xj=cols[0],yj=cols[1]!=null?cols[1]:null;
+    if(yj!=null&&isNumCol(sd,xj)&&!isNumCol(sd,yj)){[xj,yj]=[yj,xj]}
+    if(yj!=null&&!isNumCol(sd,yj))yj=null;
+    const mode=yj==null||/cuent|conteo|cuantos/.test(n)?'count':/promedio|media/.test(n)?'avg':'sum';
+    const data=aggregate(sd,xj,yj,mode).sort((a,b)=>b[1]-a[1]).map(d=>[d[0],Math.round(d[1]*100)/100]);
+    const hd=[sd.headers[xj],mode==='count'?'Conteo':({sum:'Suma de ',avg:'Promedio de '}[mode])+sd.headers[yj]];
+    resCard(q,tableEl(hd,data,200),h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'sm',onclick:()=>saveXlsx([{name:'Resumen',headers:hd,rows:data}],'resumen.xlsx')},'Descargar Excel'),
+      h('button',{class:'sm',onclick:()=>{$('#cmd').value='gráfica de '+sd.headers[xj]+(yj!=null?' y '+sd.headers[yj]:'');$('#cmd').focus()}},'Preparar gráfica')));return}
+  // búsqueda
+  const m=/(?:busca(?:r|me)?|encuentra|donde esta|localiza)\s+(.+)/i.exec(q.normalize('NFC'));
+  if(m){
+    let term=m[1].trim();const allSheets=/todas las hojas/i.test(term);
+    term=term.replace(/\s+en todas las hojas/i,'').replace(/\s+en (?:la )?columna\s+.+$/i,'').replace(/^["“']|["”']$/g,'').trim();
+    const t=norm(term);let limitCols=cols.length?cols:null;
+    const f=pickC.file();const targets=allSheets?f.sheetNames:[pickC.sd.__n];
+    const hits=[];const status=h('div',{class:'spin'},'Buscando…');const card=resCard(q,status);
+    for(let si=0;si<targets.length;si++){
+      status.textContent='Buscando… hoja '+(si+1)+' de '+targets.length;
+      const s=await getSheet(f,targets[si]);const cj=limitCols&&s===sd?limitCols:s.headers.map((_,j)=>j);
+      for(let i=0;i<s.rows.length&&hits.length<300;i++){const r=s.rows[i];
+        for(const j of cj){const v=r[j];if(v!=null&&norm(fmt(v)).includes(t)){hits.push([targets[si],i+2,s.headers[j],fmt(v)]);break}}}
+      if(hits.length>=300)break}
+    status.remove();
+    card.append(h('p',null,hits.length?(hits.length>=300?'300+':hits.length)+' coincidencias para “'+term+'”.':'No encontré “'+term+'”.'),
+      hits.length?tableEl(['Hoja','Fila (Excel)','Columna','Valor'],hits,150):null);return}
+  resCard(q,h('p',null,'No entendí ese comando. Prueba con uno de estos:'),h('ul',{class:'msg'},
+    ['gráfica de barras de <columna> y <columna>','gráfica de pastel de <columna>','cuenta por <columna>','suma de <columna> por <columna>','duplicados en <columna>','vacíos','buscar <valor> (o “en todas las hojas”)'].map(x=>h('li',null,x))))}
+
+function setupCommands(){
+  pickC=makePicker($('#pickC'));
+  pickC.onload=sd=>{const ex=$('#examples');ex.replaceChildren();if(!sd||!sd.headers.length)return;
+    let num=sd.headers.findIndex((x,j)=>isNumCol(sd,j)&&/vol|cant|qty|pcs|pack|total|monto|importe|precio|doh/i.test(x));
+    if(num<0)num=sd.headers.findIndex((_,j)=>isNumCol(sd,j)&&new Set(sd.rows.map(r=>r[j])).size<sd.rows.length*.7);
+    let cat=-1;for(let j=0;j<sd.headers.length;j++){if(isNumCol(sd,j))continue;const u=new Set(sd.rows.slice(0,300).map(r=>r[j]));if(u.size>1&&u.size<=15){cat=j;break}}
+    const kj=Math.max(0,sd.headers.findIndex(x=>KEYRE.test(x)));const sample=sd.rows.find(r=>r[kj]!=null);
+    const L=[];
+    if(cat>=0&&num>=0)L.push('gráfica de barras de '+sd.headers[cat]+' y '+sd.headers[num]);
+    if(cat>=0)L.push('gráfica de pastel de '+sd.headers[cat],'cuenta por '+sd.headers[cat]);
+    L.push('duplicados en '+sd.headers[kj],'vacíos');if(sample)L.push('buscar '+fmt(sample[kj]));
+    L.forEach(t=>ex.append(h('button',{class:'chip',onclick:()=>{$('#cmd').value=t;$('#cmd').focus()}},t)))};
+  $('#cmdForm').onsubmit=e=>{e.preventDefault();const v=$('#cmd').value;runCommand(v)}
+}
+
+/* ---------- navegación ---------- */
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-go]');if(!b)return;
+  document.querySelectorAll('[data-view]').forEach(s=>s.hidden=s.dataset.view!==b.dataset.go);
+  document.querySelectorAll('#nav button').forEach(x=>x.removeAttribute('aria-current'));b.setAttribute('aria-current','page');window.scrollTo(0,0)});
+
+setupCross();setupReview();setupCommands();notify();
+})();
+</script>

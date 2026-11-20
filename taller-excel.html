@@ -322,14 +322,20 @@ function tableEl(headers,rows,max){max=max||200;
     return h('td',{class:typeof v==='number'?'n':''},fmt(v))}))));
   t.append(tb);const w=h('div',{class:'tw'},t);
   return h('div',null,w,rows.length>max?h('p',{class:'msg'},'Mostrando '+max+' de '+rows.length.toLocaleString('es')+' filas. Descarga el Excel para verlas todas.'):null)}
+/* Guardar archivo: dentro de Claude usa su capacidad de descargas; como app instalada usa la hoja de compartir del iPhone */
+async function saveFile(name,blob){
+  if(dl){await dl.save({filename:name,data:blob});return}
+  const file=new File([blob],name,{type:blob.type||'application/octet-stream'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:name});return}catch(e){if(e&&e.name==='AbortError')return}}
+  const u=URL.createObjectURL(blob),a=h('a',{href:u,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
 async function saveXlsx(sheets,filename,mkWb){
-  if(!dl){toast('Descargar no está disponible en esta vista');return}
   try{let wb;
     if(mkWb)wb=mkWb();
     else{wb=XLSX.utils.book_new();
       sheets.forEach(s=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([s.headers,...s.rows],{cellDates:true}),s.name.slice(0,31)))}
     const out=XLSX.write(wb,{type:'array',bookType:'xlsx',cellDates:true});
-    await dl.save({filename,data:new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})});toast('Archivo listo')}
+    await saveFile(filename,new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));toast('Archivo listo')}
   catch(e){if(!e||e.code!=='declined')toast('No se pudo guardar el archivo')}}
 const plain=r=>r.map(v=>v&&v.__pill?v.t:v);
 
@@ -495,7 +501,7 @@ function buildChart(o){
   const dh=[xn,...sets.map(s=>s.label)],dr=labels.map((x,i)=>[x,...sets.map(s=>s.data[i])]);
   const el=h('div',null,h('div',{class:'chartbox'},canvas),notes.map(n=>h('p',{class:'msg'},n)),
     h('div',{class:'row',style:'margin-top:8px'},
-      h('button',{class:'sm',onclick:()=>{if(!dl){toast('Descargar no está disponible aquí');return}canvas.toBlob(b=>dl.save({filename:'grafica.png',data:b}).catch(e=>{if(!e||e.code!=='declined')toast('No se pudo guardar')}))}},'Guardar imagen'),
+      h('button',{class:'sm',onclick:()=>{canvas.toBlob(b=>saveFile('grafica.png',b).catch(e=>{if(!e||e.code!=='declined')toast('No se pudo guardar')}))}},'Guardar imagen'),
       h('button',{class:'sm',onclick:()=>saveXlsx([{name:'Datos',headers:dh,rows:dr}],'datos-grafica.xlsx')},'Datos en Excel')));
   el.draw=()=>drawChart(canvas,type,labels,sets,title);
   return el}
